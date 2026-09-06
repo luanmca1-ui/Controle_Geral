@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background-color: theme("colors.papel");
+  color: theme("colors.tinta");
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Faixa diagonal usada apenas no dia em que o caixa estoura.
+   Referencia ao poste de barbeiro, e o unico ornamento do painel. */
+.faixa-risco {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    #c62a38,
+    #c62a38 4px,
+    #e0555f 4px,
+    #e0555f 8px
+  );
+}
+
+/* Faixa da marca, com as pontas recortadas como a fita do logo */
+.fita {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - 10px) 50%,
+    100% 100%,
+    0 100%,
+    10px 50%
+  );
+}
+
+/* Lancamento projetado, e nao uma conta que existe na planilha */
+.projetado {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 5px,
+    rgba(22, 57, 74, 0.06) 5px,
+    rgba(22, 57, 74, 0.06) 10px
+  );
+}
+
+:focus-visible {
+  outline: 2px solid theme("colors.pinho");
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
