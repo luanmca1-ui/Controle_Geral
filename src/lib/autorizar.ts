@@ -24,7 +24,7 @@ export async function sessaoAtual(): Promise<Sessao | null> {
       ...sessao,
       nome: acesso.nome || sessao.nome,
       perfil: acesso.perfil,
-      unidade: acesso.unidade,
+      unidades: acesso.unidades,
     };
   } catch {
     // Se a planilha estiver fora do ar, o cookie assinado ainda vale.

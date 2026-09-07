@@ -9,7 +9,7 @@ export async function GET() {
   const sessao = await sessaoAtual();
   if (!sessao) return NextResponse.json({ erro: "Sem sessão." }, { status: 401 });
   return NextResponse.json({
-    sessao: { nome: sessao.nome, perfil: sessao.perfil, unidade: sessao.unidade },
+    sessao: { nome: sessao.nome, perfil: sessao.perfil, unidades: sessao.unidades },
   });
 }
 
@@ -46,11 +46,11 @@ export async function POST(requisicao: Request) {
     codigo: acesso.codigo,
     nome: acesso.nome,
     perfil: acesso.perfil,
-    unidade: acesso.unidade,
+    unidades: acesso.unidades,
   });
 
   const resposta = NextResponse.json({
-    sessao: { nome: acesso.nome, perfil: acesso.perfil, unidade: acesso.unidade },
+    sessao: { nome: acesso.nome, perfil: acesso.perfil, unidades: acesso.unidades },
   });
 
   resposta.cookies.set(NOME_COOKIE, token, {

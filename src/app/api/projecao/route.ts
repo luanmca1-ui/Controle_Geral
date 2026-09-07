@@ -60,11 +60,11 @@ export async function GET(requisicao: Request) {
       lerConfig(),
     ]);
 
-    // Gerente enxerga uma unidade so. O corte acontece antes do calculo,
-    // para que os totais da tela batam com o que a pessoa pode ver.
-    const soUnidade = sessao.perfil === "gerente" ? sessao.unidade : null;
+    // O corte acontece antes do calculo, para que os totais da tela batam
+    // com o que a pessoa pode ver. Lista vazia libera a rede inteira.
+    const permitidas = new Set(sessao.unidades);
     const filtrar = <T extends { unidade: string }>(itens: T[]): T[] =>
-      soUnidade ? itens.filter((item) => item.unidade === soUnidade) : itens;
+      permitidas.size > 0 ? itens.filter((item) => permitidas.has(item.unidade)) : itens;
 
     const resultado = projetar({
       faturamento: filtrar(faturamentoTodo),
@@ -78,7 +78,7 @@ export async function GET(requisicao: Request) {
 
     return NextResponse.json({
       ...resultado,
-      sessao: { nome: sessao.nome, perfil: sessao.perfil, unidade: sessao.unidade },
+      sessao: { nome: sessao.nome, perfil: sessao.perfil, unidades: sessao.unidades },
     });
   } catch (erro) {
     const mensagem = erro instanceof Error ? erro.message : "Falha ao ler a planilha.";

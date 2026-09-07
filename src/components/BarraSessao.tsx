@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 interface Dados {
   nome: string;
   perfil: string;
-  unidade: string;
+  unidades: string[];
 }
 
 const ROTULO_PERFIL: Record<string, string> = {
@@ -45,12 +46,23 @@ export default function BarraSessao() {
         {dados.nome}
         <span className="text-grafite/70">
           {" · "}
-          {dados.unidade || ROTULO_PERFIL[dados.perfil] || dados.perfil}
+          {dados.unidades.length === 0
+            ? `rede inteira, ${ROTULO_PERFIL[dados.perfil] ?? dados.perfil}`
+            : dados.unidades.length === 1
+              ? dados.unidades[0]
+              : `${dados.unidades.length} unidades`}
         </span>
       </span>
-      <button type="button" onClick={() => void sair()} className="shrink-0 underline underline-offset-2">
-        Sair
-      </button>
+      <span className="flex shrink-0 items-center gap-3">
+        {(dados.perfil === "dono" || dados.perfil === "gestora") && (
+          <Link href="/config" className="underline underline-offset-2">
+            Ajustes
+          </Link>
+        )}
+        <button type="button" onClick={() => void sair()} className="underline underline-offset-2">
+          Sair
+        </button>
+      </span>
     </div>
   );
 }

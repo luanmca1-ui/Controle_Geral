@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { use, useState } from "react";
 import GraficoCaixa from "@/components/GraficoCaixa";
+import Pendencias from "@/components/Pendencias";
 import Avisos from "@/components/Avisos";
 import SeletorPeriodo from "@/components/SeletorPeriodo";
 import { Carregando, Erro, Vazio } from "@/components/Estado";
@@ -277,40 +278,8 @@ export default function PaginaUnidade({
             </p>
           </section>
 
-          <section>
-            <h2 className="mb-2 text-lg font-semibold">
-              Pendências
-              {unidade.totalPendencias > 0 && (
-                <span className="ml-2 font-mono text-sm font-normal text-risco">
-                  {formatarMoeda(unidade.totalPendencias)}
-                </span>
-              )}
-            </h2>
-            {unidade.pendencias.length === 0 ? (
-              <Vazio texto="Nenhuma conta vencida em aberto." />
-            ) : (
-              <>
-                <p className="mb-2 text-sm text-grafite">
-                  Já venceram e não foram pagas. Ficam fora da linha do tempo porque a data
-                  delas passou, mas continuam devendo.
-                </p>
-                <ul className="divide-y divide-linha border border-linha bg-superficie">
-                  {unidade.pendencias.map((conta) => (
-                    <li key={conta.id} className="flex items-baseline gap-3 px-3 py-2.5 text-sm">
-                      <span className="w-14 shrink-0 text-grafite">
-                        {conta.vencimento ? formatarDataCurta(conta.vencimento) : ""}
-                      </span>
-                      <span className="flex-1">
-                        {conta.favorecido}
-                        <span className="block text-grafite">{conta.categoria}</span>
-                      </span>
-                      <span className="font-mono">{formatarMoeda(conta.valor)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </section>
+          <Pendencias contas={unidade.pendencias} />
+
         </>
       )}
     </main>

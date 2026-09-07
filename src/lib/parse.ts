@@ -144,6 +144,31 @@ export function formatarDataCurta(data: string): string {
   return `${dia}/${mes}`;
 }
 
+const MES_CURTO = [
+  "jan", "fev", "mar", "abr", "mai", "jun",
+  "jul", "ago", "set", "out", "nov", "dez",
+];
+
+/** "2026-09" vira "set/26". */
+export function formatarMesCurto(chaveMes: string): string {
+  const [ano, mes] = chaveMes.split("-");
+  return `${MES_CURTO[Number(mes) - 1]}/${ano.slice(2)}`;
+}
+
+/** "2026-09" vira "setembro de 2026". */
+export function formatarMesLongo(chaveMes: string): string {
+  const nomes = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  ];
+  const [ano, mes] = chaveMes.split("-");
+  return `${nomes[Number(mes) - 1]} de ${ano}`;
+}
+
+export function mesDaData(data: string): string {
+  return data.slice(0, 7);
+}
+
 export function slugDaUnidade(unidade: string): string {
   return encodeURIComponent(unidade);
 }

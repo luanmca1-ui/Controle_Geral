@@ -107,7 +107,7 @@ Quem pode entrar no painel. Uma linha por pessoa.
 | A | Nome | aparece no topo da tela e é gravado como autor do saldo |
 | B | Código | o código que a pessoa digita para entrar |
 | C | Perfil | `dono`, `gestora` ou `gerente` |
-| D | Unidade | só para gerente, com o nome padronizado da unidade |
+| D | Unidades | vazio = todas; ou os nomes padronizados separados por vírgula |
 | E | Ativo | `Sim` ou `Não`; célula vazia conta como Sim |
 
 Exemplo:
@@ -117,14 +117,29 @@ Exemplo:
 | Luan | LUAN-8842 | dono | | Sim |
 | Camila | GEST-3170 | gestora | | Sim |
 | Rafael | METR-5529 | gerente | Metrópole | Sim |
+| Bruno | SUP-4416 | gestora | Metrópole, Marabá, Castanheira | Sim |
 
-O que cada perfil faz:
+Escopo e permissão são coisas separadas:
 
-| | Vê | Edita saldos | Ajustes |
-|---|---|---|---|
-| dono | todas as unidades | sim | sim |
-| gestora | todas as unidades | sim | sim |
-| gerente | só a unidade da coluna D | não | não |
+- **A coluna D define o que a pessoa vê**, seja qual for o perfil. Vazia
+  libera a rede inteira. Com nomes, só aqueles. Aceita vírgula ou ponto e
+  vírgula: `Metrópole, Marabá, Castanheira`.
+- **O perfil define se ela pode editar.** `dono` e `gestora` editam saldos e
+  ajustes; `gerente` é somente leitura.
+
+Combinando os dois:
+
+| Quero | Perfil | Unidades |
+|---|---|---|
+| Dono, vê e edita tudo | dono | vazio |
+| Gestora da rede | gestora | vazio |
+| Supervisor de 3 lojas, edita as 3 | gestora | Metrópole, Marabá, Castanheira |
+| Gerente de uma loja, só olha | gerente | Metrópole |
+| Sócio que acompanha 5 lojas sem mexer | gerente | as 5, separadas por vírgula |
+
+Os nomes precisam ser idênticos aos da coluna A da ContaStone. Um nome
+escrito errado é ignorado em silêncio, e a pessoa vê uma unidade a menos do
+que deveria.
 
 Para revogar um acesso, escreva `Não` na coluna Ativo ou apague a linha. Vale
 em até um minuto, sem redeploy. O perfil e a unidade são reconferidos na
@@ -205,7 +220,15 @@ fixas, e o resumo abaixo da tabela mostra os três blocos somados em separado.
 
 **Contas consideradas.** Só as que estão sem Data de Pagamento na coluna F.
 As que já venceram e continuam em aberto não entram na linha do tempo: vão
-para o bloco de Pendências, com o total separado.
+para o bloco de Pendências.
+
+As pendências são separadas em abas por mês de vencimento, e o mês corrente
+abre selecionado. O total do cabeçalho segue a aba aberta, não a soma de
+tudo. O motivo é prático: pendência de um ano atrás quase sempre é baixa que
+não foi dada na planilha, e somada ao que venceu esta semana ela inflaria o
+número que serve para decidir pagamento. Quando existem meses anteriores com
+saldo, o painel avisa quanto há fora do total e sugere conferir se são
+dívidas mesmo.
 
 ---
 
@@ -229,7 +252,72 @@ para o bloco de Pendências, com o total separado.
 | `/unidade/[nome]` | Linha do tempo dia a dia, contas por dia, pendências |
 | `/contas` | Contas a pagar com filtro por unidade e busca |
 | `/saldos` | Onde a gestora atualiza o saldo de cada unidade |
-| `/config` | Taxas, janela da média, reserva mínima |
+| `/juridico` | **Esboço.** Documentos da unidade e contratos dos profissionais |
+| `/equipe` | **Esboço.** Ranking e desempenho por profissional |
+| `/config` | Taxas, comissão, janela da média, reserva mínima |
+
+Ajustes saiu da barra inferior e virou um link no topo, ao lado de Sair, para
+os cinco itens principais caberem na tela do celular. Só aparece para quem
+tem perfil de edição.
+
+---
+
+## Telas em desenvolvimento
+
+Jurídico e Equipe já estão navegáveis, mas com **dados fictícios**. Servem
+para fechar o formato antes de mexer na planilha. As duas mostram um aviso no
+topo e a lista do que falta.
+
+### Jurídico
+
+Precisa de duas abas novas.
+
+**`Profissionais`** — cole o que você já mantém no Excel, com as colunas de
+Unidade, Nome completo, Apelido, Email, Telefones, CPF, Administrador, Possui
+agenda, Data de nascimento, Status, Faz Lançamento PAT, Data Início, Forma
+relação profissional, Função, obs, Contrato, Data Contrato, Pasta Parceiro e
+as doze colunas de NF por mês.
+
+A coluna Unidade precisa do nome padronizado, o mesmo das outras abas.
+
+Três alertas que o painel já monta a partir dessas colunas: profissional sem
+contrato assinado, contrato marcado como assinado mas com Data Contrato
+vazia, e nota fiscal do mês pendente. O segundo caso aparece nos seus dados
+de exemplo: duas das três linhas têm contrato `VERDADEIRO` sem data, e sem
+ela não dá para saber quando renova.
+
+**`DocumentosUnidade`** — unidade, documento, órgão emissor, número, data de
+emissão, validade, link do arquivo e observação. Cobre alvará, AVCB, licença
+sanitária, contrato de locação com o shopping, laudo elétrico e o que mais
+aparecer.
+
+Falta definir com quantos dias de antecedência cada tipo entra em alerta. O
+alvará costuma pedir 60 dias; contrato de shopping, bem mais.
+
+**Sobre privacidade:** essa aba tem CPF, telefone e data de nascimento. Hoje
+qualquer código de acesso abriria a tela inteira. Antes de ligar nos dados
+reais, vale restringir a aba a perfis de edição e mascarar o CPF na
+listagem.
+
+### Equipe
+
+Depende de um dado que a planilha ainda não tem: o faturamento aberto por
+profissional. A aba `Faturamento` é por unidade e por dia, sem a coluna de
+quem atendeu.
+
+Sugestão de aba **`FaturamentoProfissional`**, uma linha por atendimento:
+
+```
+Data · Unidade · Profissional · Serviço · Valor · Forma de pagamento · Cliente · Duração
+```
+
+Com a coluna Cliente vem a taxa de retorno e a fidelização. Com Duração vem a
+ocupação real da agenda. Sem elas o ranking fica limitado a faturamento,
+atendimentos e ticket médio, o que já serve, mas mostra bem menos.
+
+Se o sistema da barbearia exporta esses dados, o melhor caminho é jogar a
+exportação numa aba e o painel ler de lá, do mesmo jeito que já acontece com
+o faturamento diário. Digitar à mão não se sustenta com 18 unidades.
 
 ---
 

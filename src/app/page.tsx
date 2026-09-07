@@ -140,7 +140,8 @@ export default function PaginaCaixa() {
                 <span className="font-mono font-medium text-tinta">
                   {formatarMoeda(dados.resumo.totalPendencias)}
                 </span>{" "}
-                em contas vencidas e não pagas, que não entram na linha do tempo.
+                em contas vencidas e não pagas, somando todos os meses. Elas não entram na
+                linha do tempo. Abra a unidade para ver mês a mês.
               </p>
             )}
           </section>

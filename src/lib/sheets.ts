@@ -66,7 +66,7 @@ export const COLUNAS = {
     nome: 0, // A
     codigo: 1, // B
     perfil: 2, // C
-    unidade: 3, // D
+    unidades: 3, // D
     ativo: 4, // E
   },
 } as const;
@@ -291,8 +291,17 @@ export interface Acesso {
   nome: string;
   codigo: string;
   perfil: Perfil;
-  unidade: string;
+  /** vazio = todas as unidades */
+  unidades: string[];
   ativo: boolean;
+}
+
+/** Aceita "Metrópole, Marabá" e "Metrópole; Marabá", em uma celula so. */
+function separarUnidades(valor: string): string[] {
+  return valor
+    .split(/[;,\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizarPerfil(valor: string): Perfil {
@@ -319,7 +328,7 @@ export async function lerAcessos(): Promise<Acesso[]> {
           nome: String(linha[col.nome] ?? "").trim(),
           codigo: String(linha[col.codigo] ?? "").trim(),
           perfil: normalizarPerfil(String(linha[col.perfil] ?? "")),
-          unidade: String(linha[col.unidade] ?? "").trim(),
+          unidades: separarUnidades(String(linha[col.unidades] ?? "")),
           // vazio conta como ativo, para nao trancar ninguem por celula em branco
           ativo: ativo === "" || ativo === "sim" || ativo === "true",
         };

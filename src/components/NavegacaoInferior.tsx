@@ -8,7 +8,8 @@ const ITENS = [
   { href: "/", rotulo: "Caixa", somenteEditor: false },
   { href: "/contas", rotulo: "Contas", somenteEditor: false },
   { href: "/saldos", rotulo: "Saldos", somenteEditor: false },
-  { href: "/config", rotulo: "Ajustes", somenteEditor: true },
+  { href: "/juridico", rotulo: "Jurídico", somenteEditor: false },
+  { href: "/equipe", rotulo: "Equipe", somenteEditor: false },
 ];
 
 export default function NavegacaoInferior() {
@@ -45,7 +46,7 @@ export default function NavegacaoInferior() {
               <Link
                 href={item.href}
                 aria-current={ativo ? "page" : undefined}
-                className={`flex h-14 items-center justify-center text-sm ${
+                className={`flex h-14 items-center justify-center px-1 text-center text-xs ${
                   ativo ? "font-semibold text-pinho" : "text-grafite"
                 }`}
               >

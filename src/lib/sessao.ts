@@ -15,8 +15,8 @@ export interface Sessao {
   codigo: string;
   nome: string;
   perfil: Perfil;
-  /** vazio significa todas as unidades */
-  unidade: string;
+  /** lista vazia significa acesso a todas as unidades */
+  unidades: string[];
   /** validade em segundos desde a epoca */
   exp: number;
 }
@@ -98,9 +98,12 @@ export function podeEditar(sessao: Sessao | null): boolean {
   return sessao?.perfil === "dono" || sessao?.perfil === "gestora";
 }
 
-/** Gerente enxerga uma unidade so. Os demais enxergam a rede inteira. */
+/**
+ * O escopo vem da coluna Unidades da aba Acessos, e nao do perfil.
+ * Lista vazia libera a rede inteira; com nomes, so aqueles.
+ */
 export function unidadePermitida(sessao: Sessao | null, unidade: string): boolean {
   if (!sessao) return false;
-  if (sessao.perfil !== "gerente") return true;
-  return sessao.unidade === unidade;
+  if (sessao.unidades.length === 0) return true;
+  return sessao.unidades.includes(unidade);
 }
