@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { NOME_COOKIE, lerSessao, sessaoConfigurada } from "@/lib/sessao";
+import {
+  abaDoCaminho,
+  NOME_COOKIE,
+  lerSessao,
+  podeVerAba,
+  sessaoConfigurada,
+} from "@/lib/sessao";
 
 const LIVRES = ["/login", "/api/login", "/manifest.json", "/sw.js"];
 
@@ -18,7 +24,18 @@ export async function middleware(requisicao: NextRequest) {
   }
 
   const sessao = await lerSessao(requisicao.cookies.get(NOME_COOKIE)?.value);
-  if (sessao) return NextResponse.next();
+
+  if (sessao) {
+    // as rotas de API refazem a checagem com os dados da planilha
+    const aba = abaDoCaminho(pathname);
+    if (aba && !podeVerAba(sessao, aba)) {
+      const destino = requisicao.nextUrl.clone();
+      destino.pathname = "/";
+      destino.search = "";
+      return NextResponse.redirect(destino);
+    }
+    return NextResponse.next();
+  }
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ erro: "Sessão expirada. Entre de novo." }, { status: 401 });

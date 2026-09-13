@@ -8,6 +8,7 @@ interface Dados {
   nome: string;
   perfil: string;
   unidades: string[];
+  abas: string[];
 }
 
 const ROTULO_PERFIL: Record<string, string> = {
@@ -54,7 +55,7 @@ export default function BarraSessao() {
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-3">
-        {(dados.perfil === "dono" || dados.perfil === "gestora") && (
+        {dados.abas?.includes("ajustes") && (
           <Link href="/config" className="underline underline-offset-2">
             Ajustes
           </Link>

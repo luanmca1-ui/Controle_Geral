@@ -9,6 +9,15 @@ import {
 } from "./parse";
 import type { AppConfig, Conta, DiaFaturamento, SaldoUnidade } from "./types";
 import type { Perfil } from "./sessao";
+import { lerDocumentosDasLinhas, type DocumentoUnidade } from "./documentos";
+import { lerComissoesDasLinhas, type LancamentoComissao } from "./comissoes";
+import {
+  letraDaColuna,
+  mapearColunas,
+  montarProfissional,
+  type MapaColunas,
+  type Profissional,
+} from "./profissionais";
 
 const ESCOPO = ["https://www.googleapis.com/auth/spreadsheets"];
 
@@ -41,6 +50,7 @@ export const COLUNAS = {
     vencimento: 4, // E
     pagamento: 5, // F
     boleto: 7, // H
+    controle: 8, // I
     statusPagamento: 12, // M
     item: 13, // N
     unidade: 15, // P - Unidade Corrigida
@@ -62,12 +72,13 @@ export const COLUNAS = {
   acessos: {
     aba: "Acessos",
     primeiraLinha: 2, // cabecalho na linha 1
-    intervalo: "Acessos!A2:E",
+    intervalo: "Acessos!A2:F",
     nome: 0, // A
     codigo: 1, // B
     perfil: 2, // C
     unidades: 3, // D
     ativo: 4, // E
+    abas: 5, // F
   },
 } as const;
 
@@ -215,6 +226,7 @@ export async function lerContas(): Promise<Conta[]> {
           vencimento: parseData(linha[col.vencimento]),
           pagamento: parseData(linha[col.pagamento]),
           boletoDisponibilizado: boleto === "sim",
+          controle: String(linha[col.controle] ?? "").trim(),
           statusPagamento: String(linha[col.statusPagamento] ?? "").trim(),
           unidade: String(linha[col.unidade] ?? "").trim(),
           item: String(linha[col.item] ?? "").trim(),
@@ -293,6 +305,8 @@ export interface Acesso {
   perfil: Perfil;
   /** vazio = todas as unidades */
   unidades: string[];
+  /** vazio = padrao do perfil */
+  abas: string[];
   ativo: boolean;
 }
 
@@ -329,6 +343,12 @@ export async function lerAcessos(): Promise<Acesso[]> {
           codigo: String(linha[col.codigo] ?? "").trim(),
           perfil: normalizarPerfil(String(linha[col.perfil] ?? "")),
           unidades: separarUnidades(String(linha[col.unidades] ?? "")),
+          abas: separarUnidades(String(linha[col.abas] ?? "")).map((item) =>
+            item
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .toLowerCase()
+          ),
           // vazio conta como ativo, para nao trancar ninguem por celula em branco
           ativo: ativo === "" || ativo === "sim" || ativo === "true",
         };
@@ -345,6 +365,153 @@ export async function buscarAcesso(codigo: string): Promise<Acesso | null> {
   return (
     acessos.find((acesso) => acesso.ativo && acesso.codigo.toLowerCase() === alvo) ?? null
   );
+}
+
+/* --------------------------------------------------------- profissionais */
+
+export const ABA_PROFISSIONAIS = "Profissionais";
+const INTERVALO_PROFISSIONAIS = "Profissionais!A1:BZ";
+
+export interface DadosProfissionais {
+  mapa: MapaColunas;
+  lista: Profissional[];
+}
+
+/** A tela avisa quando a coluna Atualizacao ainda nao existe na planilha. */
+export function temColunaAtualizacao(mapa: MapaColunas): boolean {
+  return mapa.atualizacao >= 0;
+}
+
+export async function lerProfissionais(): Promise<DadosProfissionais> {
+  return comCache("profissionais", 60, async () => {
+    const linhas = await lerIntervalo(INTERVALO_PROFISSIONAIS);
+    if (linhas.length === 0) {
+      throw new Error(
+        'Aba "Profissionais" vazia ou inexistente. Confira o nome da aba na planilha.'
+      );
+    }
+
+    const mapa = mapearColunas(linhas[0]);
+    if (mapa.unidade < 0 || mapa.nome < 0) {
+      throw new Error(
+        'A aba "Profissionais" precisa das colunas "Unidade Corrigida" e "Nome completo".'
+      );
+    }
+
+    const lista = linhas
+      .slice(1)
+      // a linha real na planilha e o indice mais dois: uma pelo cabecalho,
+      // outra porque a planilha comeca em 1
+      .map((linha, indice) => montarProfissional(linha, mapa, indice + 2))
+      .filter((pessoa) => pessoa.nome && pessoa.unidade);
+
+    return { mapa, lista };
+  });
+}
+
+async function gravarCelula(coluna: number, linha: number, valor: boolean | string) {
+  const sheets = conectar();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: idDaPlanilha(),
+    range: `${ABA_PROFISSIONAIS}!${letraDaColuna(coluna)}${linha}`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[valor]] },
+  });
+}
+
+/** Carimba a coluna Atualizacao. Ausente, o resto continua funcionando. */
+async function carimbarAtualizacao(mapa: MapaColunas, linha: number): Promise<boolean> {
+  if (mapa.atualizacao < 0) return false;
+  const hoje = hojeEmSaoPaulo();
+  const [ano, mes, dia] = hoje.split("-");
+  await gravarCelula(mapa.atualizacao, linha, `${dia}/${mes}/${ano}`);
+  return true;
+}
+
+/**
+ * Marca ou desmarca o contrato de um profissional.
+ * A pasta no Drive e obrigatoria ao marcar como assinado: contrato sem
+ * arquivo guardado nao serve de comprovacao depois.
+ */
+export async function gravarContrato(
+  linha: number,
+  assinado: boolean,
+  pasta: string | null
+): Promise<void> {
+  const { mapa, lista } = await lerProfissionais();
+  const pessoa = lista.find((item) => item.linha === linha);
+  if (!pessoa) throw new Error("Profissional nao encontrado na planilha.");
+
+  if (assinado && !pessoa.pastaParceiro && !pasta) {
+    throw new Error("Informe o link da pasta no Drive antes de marcar o contrato como assinado.");
+  }
+
+  if (mapa.contrato < 0) throw new Error('Coluna "Contrato" nao encontrada.');
+  await gravarCelula(mapa.contrato, linha, assinado);
+
+  if (pasta && mapa.pastaParceiro >= 0) {
+    await gravarCelula(mapa.pastaParceiro, linha, pasta);
+  }
+
+  await carimbarAtualizacao(mapa, linha);
+  limparCache("profissionais");
+}
+
+/** Atualiza so o link da pasta, sem mexer no contrato. */
+export async function gravarPasta(linha: number, pasta: string): Promise<void> {
+  const { mapa } = await lerProfissionais();
+  if (mapa.pastaParceiro < 0) throw new Error('Coluna "Pasta Parceiro" nao encontrada.');
+  await gravarCelula(mapa.pastaParceiro, linha, pasta);
+  await carimbarAtualizacao(mapa, linha);
+  limparCache("profissionais");
+}
+
+/** Marca a nota fiscal de um mes (0 = janeiro). */
+export async function gravarNotaFiscal(
+  linha: number,
+  mes: number,
+  entregue: boolean
+): Promise<void> {
+  const { mapa } = await lerProfissionais();
+  const coluna = mapa.notas[mes];
+  if (coluna === undefined || coluna < 0) {
+    throw new Error("Coluna de nota fiscal desse mes nao encontrada na planilha.");
+  }
+
+  await gravarCelula(coluna, linha, entregue);
+  await carimbarAtualizacao(mapa, linha);
+  limparCache("profissionais");
+}
+
+/* ------------------------------------------------------------ documentos */
+
+export async function lerDocumentos(): Promise<DocumentoUnidade[]> {
+  return comCache("documentos", 300, async () => {
+    try {
+      const linhas = await lerIntervalo("DocumentosUnidade!A1:Z");
+      return lerDocumentosDasLinhas(linhas);
+    } catch {
+      // a aba pode ainda nao existir
+      return [];
+    }
+  });
+}
+
+/* -------------------------------------------------------------- comissoes */
+
+export async function lerComissoes(): Promise<LancamentoComissao[]> {
+  return comCache("comissoes", 300, async () => {
+    for (const aba of ["Comissões", "Comissoes"]) {
+      try {
+        const linhas = await lerIntervalo(`${aba}!A1:Z`);
+        const lancamentos = lerComissoesDasLinhas(linhas);
+        if (lancamentos.length > 0) return lancamentos;
+      } catch {
+        // tenta a proxima grafia do nome da aba
+      }
+    }
+    return [];
+  });
 }
 
 /* ---------------------------------------------------------------- config */

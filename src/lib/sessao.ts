@@ -17,6 +17,8 @@ export interface Sessao {
   perfil: Perfil;
   /** lista vazia significa acesso a todas as unidades */
   unidades: string[];
+  /** abas liberadas; vazio usa o padrao do perfil */
+  abas: string[];
   /** validade em segundos desde a epoca */
   exp: number;
 }
@@ -86,12 +88,66 @@ export async function lerSessao(token: string | undefined): Promise<Sessao | nul
   if (diferenca !== 0) return null;
 
   try {
-    const sessao = JSON.parse(new TextDecoder().decode(deBase64Url(corpo))) as Sessao;
-    if (!sessao.exp || sessao.exp < Math.floor(Date.now() / 1000)) return null;
-    return sessao;
+    const bruto = JSON.parse(new TextDecoder().decode(deBase64Url(corpo))) as Partial<Sessao>;
+    if (!bruto.exp || bruto.exp < Math.floor(Date.now() / 1000)) return null;
+
+    // Cookies emitidos por versoes anteriores nao tem todos os campos.
+    // Eles continuam validos por 30 dias, entao a leitura preenche o que
+    // faltar em vez de quebrar.
+    return {
+      codigo: typeof bruto.codigo === "string" ? bruto.codigo : "",
+      nome: typeof bruto.nome === "string" ? bruto.nome : "",
+      perfil: bruto.perfil === "dono" || bruto.perfil === "gerente" ? bruto.perfil : "gestora",
+      unidades: Array.isArray(bruto.unidades) ? bruto.unidades : [],
+      abas: Array.isArray(bruto.abas) ? bruto.abas : [],
+      exp: bruto.exp,
+    };
   } catch {
     return null;
   }
+}
+
+export type Aba = "hoje" | "caixa" | "contas" | "saldos" | "juridico" | "equipe" | "ajustes";
+
+export const TODAS_ABAS: Aba[] = [
+  "hoje", "caixa", "contas", "saldos", "juridico", "equipe", "ajustes",
+];
+
+/** Quando a coluna Abas esta vazia, vale o padrao do perfil. */
+const PADRAO_PERFIL: Record<Perfil, Aba[]> = {
+  dono: TODAS_ABAS,
+  gestora: TODAS_ABAS,
+  gerente: ["caixa", "contas", "saldos", "juridico", "equipe"],
+};
+
+export function abasPermitidas(sessao: Sessao | null): Aba[] {
+  if (!sessao) return [];
+
+  const padrao = PADRAO_PERFIL[sessao.perfil] ?? PADRAO_PERFIL.gerente;
+  const escolhidas = Array.isArray(sessao.abas) ? sessao.abas : [];
+  if (escolhidas.length === 0) return padrao;
+
+  // a coluna nunca amplia alem do que o perfil permite
+  const doPerfil = new Set(padrao);
+  const filtradas = escolhidas.filter((aba): aba is Aba => doPerfil.has(aba as Aba));
+
+  // valor escrito errado na planilha nao pode trancar a pessoa fora de tudo
+  return filtradas.length > 0 ? filtradas : padrao;
+}
+
+export function abaDoCaminho(caminho: string): Aba | null {
+  if (caminho === "/" || caminho.startsWith("/unidade")) return "caixa";
+  if (caminho.startsWith("/hoje")) return "hoje";
+  if (caminho.startsWith("/contas")) return "contas";
+  if (caminho.startsWith("/saldos")) return "saldos";
+  if (caminho.startsWith("/juridico")) return "juridico";
+  if (caminho.startsWith("/equipe")) return "equipe";
+  if (caminho.startsWith("/config")) return "ajustes";
+  return null;
+}
+
+export function podeVerAba(sessao: Sessao | null, aba: Aba): boolean {
+  return abasPermitidas(sessao).includes(aba);
 }
 
 export function podeEditar(sessao: Sessao | null): boolean {
@@ -104,6 +160,6 @@ export function podeEditar(sessao: Sessao | null): boolean {
  */
 export function unidadePermitida(sessao: Sessao | null, unidade: string): boolean {
   if (!sessao) return false;
-  if (sessao.unidades.length === 0) return true;
+  if (!Array.isArray(sessao.unidades) || sessao.unidades.length === 0) return true;
   return sessao.unidades.includes(unidade);
 }

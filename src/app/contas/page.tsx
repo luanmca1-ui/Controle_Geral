@@ -4,7 +4,15 @@ import { useMemo, useState } from "react";
 import SeletorPeriodo from "@/components/SeletorPeriodo";
 import { Carregando, Erro, Vazio } from "@/components/Estado";
 import { useProjecao } from "@/components/useProjecao";
-import { formatarDataCurta, formatarMoeda, hojeEmSaoPaulo } from "@/lib/parse";
+import { formatarDataCompleta, formatarMoeda, hojeEmSaoPaulo } from "@/lib/parse";
+import {
+  classificarControle,
+  COR_STATUS,
+  DESCRICAO_STATUS,
+  ORDEM_STATUS,
+  ROTULO_STATUS,
+  type ChaveStatus,
+} from "@/lib/statusConta";
 import type { Conta } from "@/lib/types";
 
 type Filtro = "periodo" | "pendencias";
@@ -19,6 +27,7 @@ export default function PaginaContas() {
   const [filtro, setFiltro] = useState<Filtro>("periodo");
   const [unidadeFiltro, setUnidadeFiltro] = useState("");
   const [busca, setBusca] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState<ChaveStatus | "">("");
   const { dados, carregando, erro } = useProjecao(periodo, de);
 
   const contas = useMemo<ContaListada[]>(() => {
@@ -37,15 +46,39 @@ export default function PaginaContas() {
 
     return lista
       .filter((conta) => !unidadeFiltro || conta.unidade === unidadeFiltro)
+      .filter(
+        (conta) => !statusFiltro || classificarControle(conta.controle).chave === statusFiltro
+      )
       .filter((conta) => {
         if (!busca.trim()) return true;
         const alvo = `${conta.favorecido} ${conta.categoria} ${conta.item}`.toLowerCase();
         return alvo.includes(busca.trim().toLowerCase());
       })
       .sort((a, b) => (a.vencimento ?? "") < (b.vencimento ?? "") ? -1 : 1);
-  }, [dados, filtro, unidadeFiltro, busca]);
+  }, [dados, filtro, unidadeFiltro, busca, statusFiltro]);
 
   const total = contas.reduce((soma, conta) => soma + conta.valor, 0);
+
+  // a contagem ignora o filtro de status, senao os chips zerariam ao clicar
+  const porStatus = useMemo(() => {
+    if (!dados) return new Map<ChaveStatus, { quantidade: number; valor: number }>();
+    const mapa = new Map<ChaveStatus, { quantidade: number; valor: number }>();
+
+    for (const unidade of dados.unidades) {
+      const fonte =
+        filtro === "periodo" ? unidade.dias.flatMap((dia) => dia.contas) : unidade.pendencias;
+      for (const conta of fonte) {
+        if (unidadeFiltro && conta.unidade !== unidadeFiltro) continue;
+        const chave = classificarControle(conta.controle).chave;
+        const atual = mapa.get(chave) ?? { quantidade: 0, valor: 0 };
+        mapa.set(chave, {
+          quantidade: atual.quantidade + 1,
+          valor: atual.valor + conta.valor,
+        });
+      }
+    }
+    return mapa;
+  }, [dados, filtro, unidadeFiltro]);
 
   return (
     <main className="py-5">
@@ -107,6 +140,43 @@ export default function PaginaContas() {
         </label>
       </div>
 
+      {dados && porStatus.size > 0 && (
+        <div className="mb-4">
+          <p className="mb-1.5 text-sm text-grafite">Controle de agendamento</p>
+          <ul className="flex flex-wrap gap-2">
+            {ORDEM_STATUS.filter((chave) => porStatus.has(chave)).map((chave) => {
+              const dado = porStatus.get(chave)!;
+              const ativo = statusFiltro === chave;
+              return (
+                <li key={chave}>
+                  <button
+                    type="button"
+                    aria-pressed={ativo}
+                    title={DESCRICAO_STATUS[chave]}
+                    onClick={() => setStatusFiltro(ativo ? "" : chave)}
+                    className={`border-l-4 ${COR_STATUS[chave]} px-3 py-1.5 text-left text-xs ${
+                      ativo ? "bg-pinho text-papel" : "bg-superficie text-tinta"
+                    }`}
+                  >
+                    <span className="block font-medium">{ROTULO_STATUS[chave]}</span>
+                    <span className={`block font-mono ${ativo ? "" : "text-grafite"}`}>
+                      {dado.quantidade} · {formatarMoeda(dado.valor)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {porStatus.has("semStatus") && (
+            <p className="mt-2 border-l-2 border-risco bg-superficie px-3 py-2 text-sm text-grafite">
+              {porStatus.get("semStatus")!.quantidade} conta(s) sem Controle de Status
+              preenchido. O painel não edita esse campo: a correção é na planilha, na coluna
+              I da aba BContasFixas.
+            </p>
+          )}
+        </div>
+      )}
+
       {carregando && <Carregando />}
       {erro && <Erro mensagem={erro} />}
 
@@ -124,12 +194,12 @@ export default function PaginaContas() {
               {contas.map((conta) => (
                 <li
                   key={`${conta.unidade}-${conta.id}`}
-                  className={`flex items-baseline gap-3 px-3 py-2.5 text-sm ${
-                    conta.vencida ? "border-l-2 border-risco" : ""
+                  className={`flex items-baseline gap-3 border-l-4 px-3 py-2.5 text-sm ${
+                    COR_STATUS[classificarControle(conta.controle).chave]
                   }`}
                 >
-                  <span className="w-14 shrink-0 text-grafite">
-                    {conta.vencimento ? formatarDataCurta(conta.vencimento) : "—"}
+                  <span className="w-20 shrink-0 text-grafite">
+                    {conta.vencimento ? formatarDataCompleta(conta.vencimento) : "—"}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{conta.favorecido}</span>
@@ -138,6 +208,10 @@ export default function PaginaContas() {
                       {!conta.boletoDisponibilizado && (
                         <span className="text-atencao"> · sem boleto</span>
                       )}
+                    </span>
+                    <span className="block truncate text-xs text-grafite">
+                      {classificarControle(conta.controle).original ||
+                        "sem Controle de Status"}
                     </span>
                   </span>
                   <span className="font-mono">{formatarMoeda(conta.valor)}</span>

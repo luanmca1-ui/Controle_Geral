@@ -22,6 +22,8 @@ export interface Conta {
   vencimento: string | null; // AAAA-MM-DD
   pagamento: string | null;
   boletoDisponibilizado: boolean;
+  /** texto cru da coluna I, "Controle de Status" */
+  controle: string;
   statusPagamento: string;
   unidade: string;
   item: string;
@@ -58,7 +60,14 @@ export interface DiaProjecao {
   /** true quando a entrada veio do faturamento lancado, nao da media */
   real: boolean;
   /** semana fechada que serviu de base para a comissao do dia */
-  comissaoBase: { inicio: string; fim: string; diasReais: number } | null;
+  comissaoBase: {
+    inicio: string;
+    fim: string;
+    diasReais: number;
+    /** true quando o valor veio da aba Comissoes, e nao do percentual */
+    apurada: boolean;
+    diasApurados: number;
+  } | null;
 }
 
 export interface ProjecaoUnidade {

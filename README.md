@@ -248,6 +248,7 @@ dívidas mesmo.
 
 | Rota | O que faz |
 |---|---|
+| `/hoje` | Painel da gestão: o que pede decisão agora. Só dono e gestora |
 | `/` | Consolidado da rede, unidades ordenadas por risco |
 | `/unidade/[nome]` | Linha do tempo dia a dia, contas por dia, pendências |
 | `/contas` | Contas a pagar com filtro por unidade e busca |
@@ -262,42 +263,189 @@ tem perfil de edição.
 
 ---
 
+## Controle de agendamento das contas
+
+A coluna **I** da `BContasFixas`, "Controle de Status", diz em que pé está o
+pagamento. O texto é livre, então o painel classifica por palavra-chave e não
+por valor exato: uma grafia nova não quebra a tela, cai em "Outro" e aparece
+com o texto original.
+
+| Grupo | Reconhece | Significa |
+|---|---|---|
+| Aguardando aprovação | `Agendado (Aguard. …)`, qualquer "aguard" ou "pendente" | A gestora agendou e espera o aval |
+| Sem status | célula vazia | Ninguém preencheu |
+| Agendado e confirmado | `Agendado (Confirmado …)`, ou só "Agendado" | Agendamento feito |
+| Aprovado | qualquer "aprovad" | Já resolvido |
+| Outro | o resto | Aparece com o texto original |
+
+Na tela de Contas os grupos viram botões com quantidade e valor, que também
+filtram a lista. Cada linha ganha uma barra colorida do lado e mostra o texto
+original do status.
+
+O painel **não edita** esse campo. Contas sem status aparecem em vermelho com
+o aviso de que a correção é manual, na planilha.
+
+---
+
+## Painel "O que ver hoje"
+
+Rota `/hoje`, visível só para perfis de edição. Junta num lugar só o que pede
+decisão, ordenado por gravidade:
+
+1. Unidades sem caixa para o período, com o dia em que furam
+2. Agendamentos aguardando aprovação, que é o que está parado esperando o dono
+3. Contas sem Controle de Status preenchido
+4. Contas vencidas em aberto
+5. Profissionais sem contrato, com destaque para os que já foram cobrados
+6. Nota fiscal do mês pendente
+
+Usa os mesmos períodos do resto do painel: 7 dias, 15 dias, fim do mês e a
+data de partida escolhida.
+
+---
+
 ## Telas em desenvolvimento
 
 Jurídico e Equipe já estão navegáveis, mas com **dados fictícios**. Servem
 para fechar o formato antes de mexer na planilha. As duas mostram um aviso no
 topo e a lista do que falta.
 
-### Jurídico
+### Aba `Acessos`: controle por aba
 
-Precisa de duas abas novas.
+A coluna **F**, chamada `Abas`, limita quais telas cada pessoa abre. Vazia,
+vale o padrão do perfil. Com valores, só aqueles, separados por vírgula:
 
-**`Profissionais`** — cole o que você já mantém no Excel, com as colunas de
-Unidade, Nome completo, Apelido, Email, Telefones, CPF, Administrador, Possui
-agenda, Data de nascimento, Status, Faz Lançamento PAT, Data Início, Forma
-relação profissional, Função, obs, Contrato, Data Contrato, Pasta Parceiro e
-as doze colunas de NF por mês.
+`hoje, caixa, contas, saldos, juridico, equipe, ajustes`
 
-A coluna Unidade precisa do nome padronizado, o mesmo das outras abas.
+| Perfil | Padrão quando a coluna F está vazia |
+|---|---|
+| dono | todas |
+| gestora | todas |
+| gerente | caixa, contas, saldos, juridico, equipe |
 
-Três alertas que o painel já monta a partir dessas colunas: profissional sem
-contrato assinado, contrato marcado como assinado mas com Data Contrato
-vazia, e nota fiscal do mês pendente. O segundo caso aparece nos seus dados
-de exemplo: duas das três linhas têm contrato `VERDADEIRO` sem data, e sem
-ela não dá para saber quando renova.
+A coluna nunca amplia além do perfil: colocar `ajustes` para um gerente não
+libera nada, porque o perfil dele não tem essa aba. Para reduzir, funciona:
+um gerente com `caixa, contas` só vê essas duas.
 
-**`DocumentosUnidade`** — unidade, documento, órgão emissor, número, data de
-emissão, validade, link do arquivo e observação. Cobre alvará, AVCB, licença
-sanitária, contrato de locação com o shopping, laudo elétrico e o que mais
-aparecer.
+O bloqueio acontece em três camadas. A barra de navegação esconde o que a
+pessoa não tem, o middleware redireciona quem digita a URL na mão, e as rotas
+de API refazem a checagem contra a planilha.
 
-Falta definir com quantos dias de antecedência cada tipo entra em alerta. O
-alvará costuma pedir 60 dias; contrato de shopping, bem mais.
+---
 
-**Sobre privacidade:** essa aba tem CPF, telefone e data de nascimento. Hoje
-qualquer código de acesso abriria a tela inteira. Antes de ligar nos dados
-reais, vale restringir a aba a perfis de edição e mascarar o CPF na
-listagem.
+### Jurídico (parte de profissionais já funciona)
+
+Lê a aba **`Profissionais`**. As colunas são localizadas **pelo nome no
+cabeçalho da linha 1**, não por letra fixa, então inserir ou mover coluna não
+quebra nada. Os nomes procurados:
+
+`Unidade Corrigida` (com `Unidade` como reserva), `Nome completo`, `Apelido`,
+`Função`, `Forma relação profissional`, `Status`, `Data Inicio`, `Contrato`,
+`Data Contrato`, `Pasta Parceiro`, `obs` e as doze `NF | JAN` … `NF | DEZ`.
+
+O que a tela faz:
+
+- Filtro por unidade, com o **percentual de contratos assinados** entre os
+  ativos e o percentual de NF entregue no mês escolhido
+- Seletor de mês para a nota fiscal, começando no mês corrente
+- Botão "Só pendentes", que deixa na lista quem está sem contrato ou sem NF
+- Clique alterna `VERDADEIRO` e `FALSO` direto na planilha
+- Quem tem `Status` igual a `Inativo` fica fora das contagens
+- A coluna `obs` aparece abaixo do nome, que é onde costuma estar a
+  explicação de quem está com contrato `FALSO`
+
+**Regra do contrato:** clicar não grava nada. O botão "Editar contrato e
+pasta" abre um painel com a marcação de contrato e o campo do link do Drive,
+e só o Salvar escreve na planilha. O link pode ser adicionado ou trocado a
+qualquer momento, e marcar contrato como assinado exige que ele esteja
+preenchido: contrato sem arquivo guardado não comprova nada depois.
+
+**Situação do contrato.** São quatro, e a diferença entre as duas piores
+importa:
+
+| Situação | Quando |
+|---|---|
+| Contrato assinado | `Contrato` verdadeiro e com `Data Contrato` |
+| Assinado, sem data | verdadeiro mas sem a data preenchida |
+| **Solicitado, sem retorno** | sem contrato e a `obs` menciona solicitação, envio ou cobrança |
+| Sem contrato | sem contrato e sem nada registrado na obs |
+
+"Solicitado, sem retorno" ganha destaque próprio, porque significa que já se
+foi atrás e não voltou. A lista sobe os pendentes para o topo, com esses
+primeiro.
+
+**Coluna `Atualização`.** Crie uma coluna com esse nome na aba
+`Profissionais`. Toda alteração feita pelo painel carimba a data nela, e a
+tela mostra "atualizado em" junto de cada pessoa. Sem a coluna o painel
+continua funcionando, mas avisa que o registro não está sendo guardado.
+
+**Escopo e permissão.** Dono e gestora veem todas as unidades e editam.
+Gerente vê só as unidades da coluna D da aba `Acessos` e não edita. O corte
+acontece no servidor, então quem tem escopo limitado não recebe as outras
+unidades nem no JSON.
+
+### Documentos da unidade
+
+Lê a aba **`DocumentosUnidade`**, também por nome de cabeçalho: `unidade`
+(ou `Unidade Corrigida`), `documento`, `órgão`, `número`, `emissão`,
+`Vencimento`, `Alerta (dias)`, `Protocolo renovação`, `Custo renovação`,
+`Responsável`, `Arquivo` e `Obs`.
+
+A situação sai da comparação entre o vencimento e a coluna de alerta, que é
+por documento e não geral: 60 dias para o alvará sanitário e 180 para a
+licença ambiental funcionam lado a lado.
+
+| Situação | Quando |
+|---|---|
+| Vencido | a data já passou |
+| Vence em breve | faltam menos dias que o alerta daquele documento |
+| Vigente | ainda fora da janela de alerta |
+| Sem vencimento | a data está vazia |
+
+Documentos vencidos sobem para o topo e geram alerta próprio. O custo de
+renovação dos vencidos e dos em alerta é somado, para dar a conta do que vai
+sair de caixa com renovação.
+
+---
+
+### Comissões reais
+
+A aba **`Comissões`** traz um lançamento por atendimento, com
+`Atendimento/Venda`, `Profissional`, `Serviço/Produto/Pacote`, `Valor`,
+`Valor Comissão`, `Vol` e `%Comissão`.
+
+Ela muda a projeção: **quando existe comissão apurada para a semana fechada,
+o painel usa a soma de `Valor Comissão` em vez do percentual sobre o
+faturamento.** O percentual continua valendo só enquanto a semana não fechou.
+A divisão entre o que sai da conta e o que é pago em espécie continua
+seguindo o percentual configurado em Ajustes, com o mesmo teto do dinheiro
+disponível.
+
+A tela mostra se o valor daquela segunda é apurado ou projetado, e quantos
+dias já foram lançados.
+
+A mesma aba alimenta a tela **Equipe**: ranking por profissional, ticket
+médio, percentual de comissão, mix de serviços e comparação com o período
+anterior de mesmo tamanho.
+
+---
+
+## Nomes de unidade: o ponto que mais quebra
+
+As abas novas vieram com grafias diferentes da mesma unidade:
+`The Barber Express Boa Vista`, `The Barber Express Boavista SP` e
+`THE BARBER BOA VISTA 2`.
+
+Todas as abas precisam de uma coluna com o **mesmo nome padronizado** usado
+em `ContaStone!A`. O painel procura primeiro por `Unidade Corrigida` e só cai
+para `Unidade` se não achar.
+
+Quando um nome não bate, o registro simplesmente não aparece, sem erro. Se
+uma unidade sumir de alguma tela, é quase sempre isso.
+
+**Sobre privacidade:** a aba tem CPF, telefone e data de nascimento. A tela
+hoje não exibe nenhum dos três, só nome, unidade, função e relação. Se algum
+deles for necessário na tela, vale mascarar e restringir a perfis de edição.
 
 ### Equipe
 

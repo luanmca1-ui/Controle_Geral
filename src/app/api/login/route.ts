@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { criarToken, NOME_COOKIE, sessaoConfigurada } from "@/lib/sessao";
+import { abasPermitidas, criarToken, NOME_COOKIE, sessaoConfigurada } from "@/lib/sessao";
 import { buscarAcesso } from "@/lib/sheets";
 import { sessaoAtual } from "@/lib/autorizar";
 
@@ -9,7 +9,12 @@ export async function GET() {
   const sessao = await sessaoAtual();
   if (!sessao) return NextResponse.json({ erro: "Sem sessão." }, { status: 401 });
   return NextResponse.json({
-    sessao: { nome: sessao.nome, perfil: sessao.perfil, unidades: sessao.unidades },
+    sessao: {
+      nome: sessao.nome,
+      perfil: sessao.perfil,
+      unidades: sessao.unidades,
+      abas: abasPermitidas(sessao),
+    },
   });
 }
 
@@ -47,10 +52,16 @@ export async function POST(requisicao: Request) {
     nome: acesso.nome,
     perfil: acesso.perfil,
     unidades: acesso.unidades,
+    abas: acesso.abas,
   });
 
   const resposta = NextResponse.json({
-    sessao: { nome: acesso.nome, perfil: acesso.perfil, unidades: acesso.unidades },
+    sessao: {
+      nome: acesso.nome,
+      perfil: acesso.perfil,
+      unidades: acesso.unidades,
+      abas: abasPermitidas({ ...acesso, codigo: acesso.codigo, exp: 0 }),
+    },
   });
 
   resposta.cookies.set(NOME_COOKIE, token, {

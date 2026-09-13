@@ -139,6 +139,12 @@ export function formatarMoedaCurta(valor: number): string {
   return formatarMoeda(valor);
 }
 
+/** "2026-10-05" vira "05/10/2026". */
+export function formatarDataCompleta(data: string): string {
+  const [ano, mes, dia] = data.split("-");
+  return `${dia}/${mes}/${ano}`;
+}
+
 export function formatarDataCurta(data: string): string {
   const [, mes, dia] = data.split("-");
   return `${dia}/${mes}`;

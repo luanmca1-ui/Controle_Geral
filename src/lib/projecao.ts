@@ -104,13 +104,16 @@ function semanaBase(
   diaPagamento: string,
   real: Map<string, DiaFaturamento>,
   medias: Map<string, Media>,
-  config: AppConfig
+  config: AppConfig,
+  comissaoReal?: Map<string, number>
 ): {
   faturamento: number;
   dinheiro: number;
   inicio: string;
   fim: string;
   diasReais: number;
+  apurada: number | null;
+  diasApurados: number;
 } {
   const inicio = somarDias(diaPagamento, -7);
   const fim = somarDias(diaPagamento, -1);
@@ -118,9 +121,18 @@ function semanaBase(
   let faturamento = 0;
   let dinheiro = 0;
   let diasReais = 0;
+  let apurada = 0;
+  let diasApurados = 0;
 
   for (let deslocamento = 0; deslocamento < 7; deslocamento++) {
     const data = somarDias(inicio, deslocamento);
+
+    const comissaoDoDia = comissaoReal?.get(`${unidade}|${data}`);
+    if (comissaoDoDia !== undefined && comissaoDoDia > 0) {
+      apurada += comissaoDoDia;
+      diasApurados += 1;
+    }
+
     const lancado = real.get(`${unidade}|${data}`);
 
     if (lancado && lancado.total > 0) {
@@ -137,10 +149,20 @@ function semanaBase(
     }
   }
 
-  return { faturamento, dinheiro, inicio, fim, diasReais };
+  return {
+    faturamento,
+    dinheiro,
+    inicio,
+    fim,
+    diasReais,
+    apurada: diasApurados > 0 ? apurada : null,
+    diasApurados,
+  };
 }
 
 export interface EntradaProjecao {
+  /** comissao ja apurada, por "unidade|data". Substitui o percentual. */
+  comissaoReal?: Map<string, number>;
   faturamento: DiaFaturamento[];
   contas: Conta[];
   saldos: SaldoUnidade[];
@@ -157,7 +179,7 @@ function classificar(menorSaldo: number, reservaMinima: number): StatusRisco {
 }
 
 export function projetar(entrada: EntradaProjecao): RespostaProjecao {
-  const { faturamento, contas, saldos, config, inicio, fim, hoje } = entrada;
+  const { faturamento, contas, saldos, config, inicio, fim, hoje, comissaoReal } = entrada;
 
   const medias = calcularMedias(faturamento, config);
   const real = indexarReal(faturamento);
@@ -255,14 +277,23 @@ export function projetar(entrada: EntradaProjecao): RespostaProjecao {
       let comissaoBase: DiaProjecao["comissaoBase"] = null;
 
       if (ehDiaComissao) {
-        const base = semanaBase(saldo.unidade, data, real, medias, config);
-        const total = base.faturamento * config.percentualComissao;
+        const base = semanaBase(saldo.unidade, data, real, medias, config, comissaoReal);
+
+        // Havendo comissao apurada na aba Comissoes, ela manda. O percentual
+        // sobre o faturamento so vale enquanto a semana nao foi fechada.
+        const total = base.apurada ?? base.faturamento * config.percentualComissao;
 
         // A parte em especie nao pode passar do dinheiro daquela semana.
         comissaoAVista = Math.min(total * config.percentualComissaoAVista, base.dinheiro);
         comissao = total - comissaoAVista;
 
-        comissaoBase = { inicio: base.inicio, fim: base.fim, diasReais: base.diasReais };
+        comissaoBase = {
+          inicio: base.inicio,
+          fim: base.fim,
+          diasReais: base.diasReais,
+          apurada: base.apurada !== null,
+          diasApurados: base.diasApurados,
+        };
 
         if (
           config.percentualComissaoAVista > 0 &&

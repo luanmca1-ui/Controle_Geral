@@ -1,189 +1,368 @@
 "use client";
 
-import { useState } from "react";
-import EsbocoAviso from "@/components/EsbocoAviso";
-import { formatarMoeda } from "@/lib/parse";
+import { useEffect, useMemo, useState } from "react";
+import { Carregando, Erro, Vazio } from "@/components/Estado";
+import { formatarDataCompleta, formatarMoeda, hojeEmSaoPaulo, somarDias } from "@/lib/parse";
+import type { DesempenhoProfissional } from "@/lib/comissoes";
 
-const UNIDADES = ["Toda a rede", "Castanheira", "Metrópole", "Marabá"];
-
-interface Profissional {
-  nome: string;
-  unidade: string;
-  faturamento: number;
-  atendimentos: number;
-  ticket: number;
-  retorno: number; // % de clientes que voltaram
-  variacao: number; // vs semana anterior
-  ocupacao: number; // % da agenda preenchida
+interface Resposta {
+  inicio: string;
+  fim: string;
+  inicioAnterior: string;
+  fimAnterior: string;
+  atual: DesempenhoProfissional[];
+  anterior: DesempenhoProfissional[];
+  temDados: boolean;
 }
 
-const RANKING: Profissional[] = [
-  { nome: "Diego Martins", unidade: "Metrópole", faturamento: 4820, atendimentos: 112, ticket: 43.04, retorno: 61, variacao: 12.4, ocupacao: 88 },
-  { nome: "Andrei Teixeira", unidade: "Castanheira", faturamento: 4310, atendimentos: 104, ticket: 41.44, retorno: 58, variacao: 3.1, ocupacao: 81 },
-  { nome: "Thiago Moreira", unidade: "Marabá", faturamento: 3970, atendimentos: 91, ticket: 43.63, retorno: 64, variacao: -2.7, ocupacao: 76 },
-  { nome: "Anderson Aires", unidade: "Castanheira", faturamento: 3540, atendimentos: 88, ticket: 40.23, retorno: 49, variacao: 8.9, ocupacao: 72 },
-  { nome: "Fernanda Alves", unidade: "Metrópole", faturamento: 3120, atendimentos: 74, ticket: 42.16, retorno: 55, variacao: -11.2, ocupacao: 63 },
-  { nome: "Bruno Carvalho", unidade: "Marabá", faturamento: 2280, atendimentos: 61, ticket: 37.38, retorno: 38, variacao: -18.6, ocupacao: 51 },
+const JANELAS = [
+  { valor: 7, rotulo: "7 dias" },
+  { valor: 14, rotulo: "14 dias" },
+  { valor: 30, rotulo: "30 dias" },
 ];
 
-const SERVICOS = [
-  { nome: "Corte", participacao: 54, ticket: 35 },
-  { nome: "Corte + barba", participacao: 22, ticket: 58 },
-  { nome: "Barba", participacao: 12, ticket: 28 },
-  { nome: "Química e pigmentação", participacao: 7, ticket: 92 },
-  { nome: "Produtos", participacao: 5, ticket: 46 },
-];
+function variacao(atual: number, anterior: number): number | null {
+  if (anterior === 0) return null;
+  return ((atual - anterior) / anterior) * 100;
+}
 
 export default function PaginaEquipe() {
-  const [unidade, setUnidade] = useState(UNIDADES[0]);
+  const [janela, setJanela] = useState(7);
+  const [unidade, setUnidade] = useState("");
+  const [dados, setDados] = useState<Resposta | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
 
-  const lista =
-    unidade === "Toda a rede" ? RANKING : RANKING.filter((p) => p.unidade === unidade);
-  const maior = Math.max(...lista.map((p) => p.faturamento), 1);
+  useEffect(() => {
+    const fim = hojeEmSaoPaulo();
+    const inicio = somarDias(fim, -(janela - 1));
+    setCarregando(true);
+    setErro(null);
+
+    fetch(`/api/equipe?inicio=${inicio}&fim=${fim}`, { cache: "no-store" })
+      .then(async (resposta) => {
+        const corpo = await resposta.json();
+        if (!resposta.ok) throw new Error(corpo?.erro ?? "Falha ao carregar.");
+        setDados(corpo as Resposta);
+      })
+      .catch((falha) =>
+        setErro(falha instanceof Error ? falha.message : "Falha ao carregar.")
+      )
+      .finally(() => setCarregando(false));
+  }, [janela]);
+
+  const unidades = useMemo(
+    () => [...new Set((dados?.atual ?? []).map((p) => p.unidade))].sort(),
+    [dados]
+  );
+
+  const lista = useMemo(
+    () => (dados?.atual ?? []).filter((p) => !unidade || p.unidade === unidade),
+    [dados, unidade]
+  );
+
+  const anterior = useMemo(() => {
+    const mapa = new Map<string, DesempenhoProfissional>();
+    for (const item of dados?.anterior ?? []) {
+      mapa.set(`${item.unidade}|${item.profissional}`, item);
+    }
+    return mapa;
+  }, [dados]);
+
+  const totais = useMemo(() => {
+    const faturamento = lista.reduce((t, p) => t + p.faturamento, 0);
+    const comissao = lista.reduce((t, p) => t + p.comissao, 0);
+    const atendimentos = lista.reduce((t, p) => t + p.atendimentos, 0);
+
+    const anteriores = (dados?.anterior ?? []).filter((p) => !unidade || p.unidade === unidade);
+    const faturamentoAnterior = anteriores.reduce((t, p) => t + p.faturamento, 0);
+    const atendimentosAnterior = anteriores.reduce((t, p) => t + p.atendimentos, 0);
+
+    return {
+      faturamento,
+      comissao,
+      atendimentos,
+      ticket: atendimentos > 0 ? faturamento / atendimentos : 0,
+      percentual: faturamento > 0 ? comissao / faturamento : 0,
+      variacaoFaturamento: variacao(faturamento, faturamentoAnterior),
+      variacaoAtendimentos: variacao(atendimentos, atendimentosAnterior),
+      ticketAnterior:
+        atendimentosAnterior > 0 ? faturamentoAnterior / atendimentosAnterior : 0,
+    };
+  }, [lista, dados, unidade]);
+
+  /** Observações geradas a partir da comparação entre os dois períodos. */
+  const insights = useMemo(() => {
+    if (!dados || lista.length === 0) return [];
+    const notas: { tom: "bom" | "ruim" | "neutro"; texto: string }[] = [];
+
+    if (totais.variacaoFaturamento !== null) {
+      const v = totais.variacaoFaturamento;
+      if (Math.abs(v) >= 5) {
+        notas.push({
+          tom: v > 0 ? "bom" : "ruim",
+          texto: `Faturamento ${v > 0 ? "subiu" : "caiu"} ${Math.abs(v).toFixed(1)}% contra os ${janela} dias anteriores.`,
+        });
+      }
+    }
+
+    if (totais.ticketAnterior > 0) {
+      const v = variacao(totais.ticket, totais.ticketAnterior);
+      if (v !== null && Math.abs(v) >= 4) {
+        notas.push({
+          tom: v > 0 ? "bom" : "ruim",
+          texto:
+            v > 0
+              ? `Ticket médio subiu ${v.toFixed(1)}%, para ${formatarMoeda(totais.ticket)}. Está vendendo serviço mais caro por atendimento.`
+              : `Ticket médio caiu ${Math.abs(v).toFixed(1)}%, para ${formatarMoeda(totais.ticket)}. Mesmo volume rende menos.`,
+        });
+      }
+    }
+
+    if (
+      totais.variacaoAtendimentos !== null &&
+      totais.variacaoFaturamento !== null &&
+      totais.variacaoAtendimentos > 3 &&
+      totais.variacaoFaturamento < 0
+    ) {
+      notas.push({
+        tom: "ruim",
+        texto:
+          "Atendeu mais gente e faturou menos. Sinal de desconto excessivo ou migração para serviços mais baratos.",
+      });
+    }
+
+    // quem caiu forte
+    for (const pessoa of lista) {
+      const antes = anterior.get(`${pessoa.unidade}|${pessoa.profissional}`);
+      if (!antes) continue;
+      const v = variacao(pessoa.faturamento, antes.faturamento);
+      if (v !== null && v <= -20) {
+        notas.push({
+          tom: "ruim",
+          texto: `${pessoa.profissional} caiu ${Math.abs(v).toFixed(0)}% no período. Vale entender se foi falta, agenda vazia ou perda de cliente.`,
+        });
+      } else if (v !== null && v >= 25) {
+        notas.push({
+          tom: "bom",
+          texto: `${pessoa.profissional} cresceu ${v.toFixed(0)}%. Vale olhar o que está fazendo diferente e repetir no resto da equipe.`,
+        });
+      }
+    }
+
+    // concentração
+    if (lista.length >= 3) {
+      const ordenados = [...lista].sort((a, b) => b.faturamento - a.faturamento);
+      const topo = ordenados[0];
+      const fatia = totais.faturamento > 0 ? topo.faturamento / totais.faturamento : 0;
+      if (fatia > 0.45) {
+        notas.push({
+          tom: "neutro",
+          texto: `${topo.profissional} responde por ${(fatia * 100).toFixed(0)}% do faturamento. Concentração alta: a saída dessa pessoa derruba a unidade.`,
+        });
+      }
+    }
+
+    // mix de serviço
+    const porServico = new Map<string, number>();
+    for (const pessoa of lista) {
+      for (const servico of pessoa.servicos) {
+        porServico.set(servico.nome, (porServico.get(servico.nome) ?? 0) + servico.valor);
+      }
+    }
+    const servicos = [...porServico.entries()].sort((a, b) => b[1] - a[1]);
+    if (servicos.length > 0 && totais.faturamento > 0) {
+      const [nome, valor] = servicos[0];
+      const fatia = valor / totais.faturamento;
+      if (fatia > 0.55) {
+        notas.push({
+          tom: "neutro",
+          texto: `"${nome}" é ${(fatia * 100).toFixed(0)}% do faturamento. Combos e serviços adicionais são o caminho mais rápido para subir o ticket.`,
+        });
+      }
+    }
+
+    if (totais.percentual > 0 && totais.percentual > 0.45) {
+      notas.push({
+        tom: "ruim",
+        texto: `A comissão está em ${(totais.percentual * 100).toFixed(1)}% do faturamento. Acima de 45% sobra pouco para custo fixo.`,
+      });
+    }
+
+    return notas;
+  }, [dados, lista, anterior, totais, janela]);
 
   return (
     <main className="py-5">
       <header className="mb-4">
         <h1 className="text-2xl font-bold tracking-tight">Equipe</h1>
-        <p className="mt-0.5 text-sm text-grafite">
-          Desempenho por profissional, semana a semana, para os líderes acompanharem.
-        </p>
+        {dados && (
+          <p className="mt-0.5 text-sm text-grafite">
+            {formatarDataCompleta(dados.inicio)} a {formatarDataCompleta(dados.fim)}, contra{" "}
+            {formatarDataCompleta(dados.inicioAnterior)} a{" "}
+            {formatarDataCompleta(dados.fimAnterior)}
+          </p>
+        )}
       </header>
 
-      <EsbocoAviso>
-        Esta tela precisa do faturamento aberto por profissional, que hoje a planilha
-        ainda não tem: o Faturamento é por unidade e por dia, sem a coluna de quem
-        atendeu.
-      </EsbocoAviso>
-
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-linha pb-px" role="tablist">
-        {UNIDADES.map((item) => (
+      <div className="mb-3 flex border border-linha bg-superficie" role="group">
+        {JANELAS.map((opcao) => (
           <button
-            key={item}
+            key={opcao.valor}
             type="button"
-            role="tab"
-            aria-selected={item === unidade}
-            onClick={() => setUnidade(item)}
-            className={`shrink-0 border-b-2 px-3 py-1.5 text-sm ${
-              item === unidade
-                ? "border-pinho font-semibold text-pinho"
-                : "border-transparent text-grafite"
+            aria-pressed={janela === opcao.valor}
+            onClick={() => setJanela(opcao.valor)}
+            className={`flex-1 px-2 py-2 text-sm ${
+              janela === opcao.valor ? "bg-pinho font-medium text-papel" : "text-grafite"
             }`}
           >
-            {item}
+            {opcao.rotulo}
           </button>
         ))}
       </div>
 
-      <section className="mb-6">
-        <h2 className="mb-2 text-lg font-semibold">Ranking da semana</h2>
-        <ol className="divide-y divide-linha border border-linha bg-superficie">
-          {lista.map((pessoa, indice) => (
-            <li key={pessoa.nome} className="px-3 py-3">
-              <div className="flex items-baseline gap-3">
-                <span className="w-5 shrink-0 font-mono text-sm text-grafite">
-                  {indice + 1}
+      {unidades.length > 1 && (
+        <select
+          value={unidade}
+          onChange={(evento) => setUnidade(evento.target.value)}
+          className="mb-4 w-full border border-linha bg-superficie px-3 py-2 text-sm"
+        >
+          <option value="">Todas as unidades</option>
+          {unidades.map((item) => (
+            <option key={item} value={item}>
+              {item}
+            </option>
+          ))}
+        </select>
+      )}
+
+      {carregando && <Carregando texto="Lendo a aba Comissões" />}
+      {erro && <Erro mensagem={erro} />}
+
+      {dados && !carregando && lista.length === 0 && (
+        <Vazio
+          texto={
+            dados.temDados
+              ? "Nenhum lançamento de comissão neste período."
+              : "A aba Comissões está vazia ou os nomes de unidade não batem com a Unidade Corrigida."
+          }
+        />
+      )}
+
+      {lista.length > 0 && (
+        <>
+          <section className="mb-4 grid grid-cols-2 gap-2">
+            <div className="border border-linha bg-superficie p-3">
+              <p className="font-mono text-xl font-bold">{formatarMoeda(totais.faturamento)}</p>
+              <p className="text-xs text-grafite">faturamento</p>
+              {totais.variacaoFaturamento !== null && (
+                <p
+                  className={`text-xs font-medium ${
+                    totais.variacaoFaturamento >= 0 ? "text-folga" : "text-risco"
+                  }`}
+                >
+                  {totais.variacaoFaturamento >= 0 ? "+" : ""}
+                  {totais.variacaoFaturamento.toFixed(1)}%
+                </p>
+              )}
+            </div>
+            <div className="border border-linha bg-superficie p-3">
+              <p className="font-mono text-xl font-bold">{formatarMoeda(totais.ticket)}</p>
+              <p className="text-xs text-grafite">ticket médio</p>
+              <p className="text-xs text-grafite">{totais.atendimentos} atendimentos</p>
+            </div>
+            <div className="col-span-2 border border-linha bg-superficie p-3">
+              <p className="font-mono text-xl font-bold">
+                {formatarMoeda(totais.comissao)}
+                <span className="ml-2 text-sm font-normal text-grafite">
+                  {(totais.percentual * 100).toFixed(1)}% do faturamento
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium">{pessoa.nome}</span>
-                  <span className="block text-sm text-grafite">
-                    {pessoa.unidade} · {pessoa.atendimentos} atendimentos · ticket{" "}
-                    {formatarMoeda(pessoa.ticket)}
-                  </span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="block font-mono text-sm font-medium">
-                    {formatarMoeda(pessoa.faturamento)}
-                  </span>
-                  <span
-                    className={`block text-xs ${
-                      pessoa.variacao >= 0 ? "text-folga" : "text-risco"
+              </p>
+              <p className="text-xs text-grafite">comissão apurada no período</p>
+            </div>
+          </section>
+
+          {insights.length > 0 && (
+            <section className="mb-5">
+              <h2 className="mb-2 text-lg font-semibold">O que os números dizem</h2>
+              <ul className="space-y-2">
+                {insights.map((nota, indice) => (
+                  <li
+                    key={indice}
+                    className={`border-l-4 bg-superficie px-3 py-2 text-sm ${
+                      nota.tom === "bom"
+                        ? "border-folga"
+                        : nota.tom === "ruim"
+                          ? "border-risco"
+                          : "border-aco"
                     }`}
                   >
-                    {pessoa.variacao >= 0 ? "+" : ""}
-                    {pessoa.variacao.toFixed(1)}% vs semana anterior
-                  </span>
-                </span>
-              </div>
+                    {nota.texto}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
-              <div className="mt-2 h-1.5 w-full bg-papel">
-                <div
-                  className="h-full bg-pinho"
-                  style={{ width: `${(pessoa.faturamento / maior) * 100}%` }}
-                />
-              </div>
+          <section className="mb-6">
+            <h2 className="mb-2 text-lg font-semibold">Ranking</h2>
+            <ol className="divide-y divide-linha border border-linha bg-superficie">
+              {lista.map((pessoa, indice) => {
+                const antes = anterior.get(`${pessoa.unidade}|${pessoa.profissional}`);
+                const v = antes ? variacao(pessoa.faturamento, antes.faturamento) : null;
+                const maior = lista[0].faturamento || 1;
 
-              <dl className="mt-2 flex gap-4 text-xs text-grafite">
-                <div className="flex gap-1">
-                  <dt>Retorno</dt>
-                  <dd className="font-mono text-tinta">{pessoa.retorno}%</dd>
-                </div>
-                <div className="flex gap-1">
-                  <dt>Ocupação</dt>
-                  <dd
-                    className={`font-mono ${
-                      pessoa.ocupacao < 60 ? "text-atencao" : "text-tinta"
-                    }`}
-                  >
-                    {pessoa.ocupacao}%
-                  </dd>
-                </div>
-              </dl>
-            </li>
-          ))}
-        </ol>
-        <p className="mt-2 text-xs text-grafite">
-          Retorno é a fatia de clientes daquele profissional que voltaram nos últimos 60
-          dias. Ocupação é quanto da agenda dele foi preenchida. Faturamento alto com
-          retorno baixo costuma indicar volume sem fidelização.
-        </p>
-      </section>
+                return (
+                  <li key={`${pessoa.unidade}-${pessoa.profissional}`} className="px-3 py-3">
+                    <div className="flex items-baseline gap-3">
+                      <span className="w-5 shrink-0 font-mono text-sm text-grafite">
+                        {indice + 1}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium">{pessoa.profissional}</span>
+                        <span className="block text-xs text-grafite">
+                          {pessoa.unidade} · {pessoa.atendimentos} atend. · ticket{" "}
+                          {formatarMoeda(pessoa.ticket)} ·{" "}
+                          {(pessoa.percentualMedio * 100).toFixed(0)}% comissão
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block font-mono text-sm font-medium">
+                          {formatarMoeda(pessoa.faturamento)}
+                        </span>
+                        {v !== null && (
+                          <span
+                            className={`block text-xs ${v >= 0 ? "text-folga" : "text-risco"}`}
+                          >
+                            {v >= 0 ? "+" : ""}
+                            {v.toFixed(1)}%
+                          </span>
+                        )}
+                      </span>
+                    </div>
 
-      <section className="mb-6">
-        <h2 className="mb-2 text-lg font-semibold">Mix de serviços</h2>
-        <ul className="divide-y divide-linha border border-linha bg-superficie">
-          {SERVICOS.map((servico) => (
-            <li key={servico.nome} className="px-3 py-2.5">
-              <div className="flex items-baseline gap-3 text-sm">
-                <span className="flex-1">{servico.nome}</span>
-                <span className="font-mono text-grafite">
-                  ticket {formatarMoeda(servico.ticket)}
-                </span>
-                <span className="w-10 text-right font-mono font-medium">
-                  {servico.participacao}%
-                </span>
-              </div>
-              <div className="mt-1.5 h-1.5 w-full bg-papel">
-                <div className="h-full bg-aco" style={{ width: `${servico.participacao}%` }} />
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
+                    <div className="mt-2 h-1.5 w-full bg-papel">
+                      <div
+                        className="h-full bg-pinho"
+                        style={{ width: `${(pessoa.faturamento / maior) * 100}%` }}
+                      />
+                    </div>
 
-      <section className="border border-linha bg-superficie p-4 text-sm text-grafite">
-        <h2 className="mb-2 text-base font-semibold text-tinta">
-          Como sugiro estruturar os dados
-        </h2>
-        <p className="mb-2">
-          Uma aba <strong className="text-tinta">FaturamentoProfissional</strong>, uma
-          linha por atendimento ou por profissional/dia:
-        </p>
-        <p className="mb-3 font-mono text-xs">
-          Data · Unidade · Profissional · Serviço · Valor · Forma de pagamento · Cliente ·
-          Duração
-        </p>
-        <p className="mb-2">
-          Com a coluna Cliente vem o retorno e a fidelização. Com Duração vem a ocupação
-          real da agenda. Sem elas o ranking fica só em faturamento e ticket, que já
-          serve, mas mostra bem menos.
-        </p>
-        <p>
-          Se o sistema da barbearia exporta isso, o melhor caminho é jogar a exportação
-          numa aba e o painel ler de lá, igual ao que já acontece com o faturamento
-          diário. Digitar à mão não se sustenta com 18 unidades.
-        </p>
-      </section>
+                    {pessoa.servicos.length > 0 && (
+                      <p className="mt-1.5 truncate text-xs text-grafite">
+                        {pessoa.servicos
+                          .slice(0, 3)
+                          .map((s) => `${s.nome} (${s.quantidade})`)
+                          .join(" · ")}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        </>
+      )}
     </main>
   );
 }

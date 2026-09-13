@@ -5,31 +5,32 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const ITENS = [
-  { href: "/", rotulo: "Caixa", somenteEditor: false },
-  { href: "/contas", rotulo: "Contas", somenteEditor: false },
-  { href: "/saldos", rotulo: "Saldos", somenteEditor: false },
-  { href: "/juridico", rotulo: "Jurídico", somenteEditor: false },
-  { href: "/equipe", rotulo: "Equipe", somenteEditor: false },
+  { href: "/hoje", rotulo: "Hoje", aba: "hoje" },
+  { href: "/", rotulo: "Caixa", aba: "caixa" },
+  { href: "/contas", rotulo: "Contas", aba: "contas" },
+  { href: "/saldos", rotulo: "Saldos", aba: "saldos" },
+  { href: "/juridico", rotulo: "Jurídico", aba: "juridico" },
+  { href: "/equipe", rotulo: "Equipe", aba: "equipe" },
 ];
 
 export default function NavegacaoInferior() {
   const caminho = usePathname();
-  const [editor, setEditor] = useState(true);
+  const [abas, setAbas] = useState<string[] | null>(null);
 
   useEffect(() => {
     if (caminho === "/login") return;
     fetch("/api/login", { cache: "no-store" })
       .then((resposta) => (resposta.ok ? resposta.json() : null))
-      .then((corpo) => {
-        const perfil = corpo?.sessao?.perfil;
-        setEditor(perfil === "dono" || perfil === "gestora");
-      })
-      .catch(() => setEditor(true));
+      .then((corpo) => setAbas((corpo?.sessao?.abas as string[]) ?? null))
+      .catch(() => setAbas(null));
   }, [caminho]);
 
   if (caminho === "/login") return null;
 
-  const visiveis = ITENS.filter((item) => editor || !item.somenteEditor);
+  // enquanto nao sabe, mostra so o que todo perfil tem
+  const visiveis = ITENS.filter((item) =>
+    abas ? abas.includes(item.aba) : item.aba === "caixa"
+  );
 
   return (
     <nav

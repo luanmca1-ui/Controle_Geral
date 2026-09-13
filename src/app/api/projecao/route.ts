@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { lerConfig, lerContas, lerFaturamento, lerSaldos } from "@/lib/sheets";
+import { lerComissoes, lerConfig, lerContas, lerFaturamento, lerSaldos } from "@/lib/sheets";
+import { comissaoPorDia } from "@/lib/comissoes";
 import { projetar } from "@/lib/projecao";
 import { fimDoMes, hojeEmSaoPaulo, somarDias } from "@/lib/parse";
 import { sessaoAtual } from "@/lib/autorizar";
@@ -53,11 +54,12 @@ export async function GET(requisicao: Request) {
       hoje
     );
 
-    const [faturamentoTodo, contasTodas, saldosTodos, config] = await Promise.all([
+    const [faturamentoTodo, contasTodas, saldosTodos, config, comissoes] = await Promise.all([
       lerFaturamento(),
       lerContas(),
       lerSaldos(),
       lerConfig(),
+      lerComissoes(),
     ]);
 
     // O corte acontece antes do calculo, para que os totais da tela batam
@@ -74,6 +76,7 @@ export async function GET(requisicao: Request) {
       inicio,
       fim,
       hoje,
+      comissaoReal: comissaoPorDia(comissoes),
     });
 
     return NextResponse.json({
