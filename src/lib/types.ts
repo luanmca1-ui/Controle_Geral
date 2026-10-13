@@ -1,3 +1,6 @@
+import type { Comparativo, Insight } from "./analise";
+import type { MesResumo, SemanaResumo } from "./agregacoes";
+
 export type StatusRisco = "ok" | "atencao" | "risco";
 
 /** Um dia de faturamento de uma unidade, ja convertido para numeros. */
@@ -6,6 +9,10 @@ export interface DiaFaturamento {
   data: string; // AAAA-MM-DD
   diaSemana: number; // 0 = domingo
   total: number;
+  /** coluna G, numero de clientes do dia */
+  clientes: number;
+  /** coluna H, atendimentos com pagamento */
+  atendimentos: number;
   credito: number;
   debito: number;
   dinheiro: number;
@@ -90,6 +97,9 @@ export interface ProjecaoUnidade {
   totalPendencias: number;
   /** ultimo dia com faturamento lancado na planilha */
   ultimoRealizado: string | null;
+  /** comparacao entre os ultimos N dias faturados e os N anteriores */
+  comparativo: Comparativo | null;
+  insights: Insight[];
   status: StatusRisco;
   avisos: string[];
 }
@@ -131,6 +141,10 @@ export interface RespostaProjecao {
   geradoEm: string;
   config: AppConfig;
   resumo: ResumoRede;
+  /** comparativo do faturamento somando todas as unidades visiveis */
+  comparativoRede: Comparativo | null;
+  evolucaoMensal: MesResumo[];
+  semanas: SemanaResumo[];
   unidades: ProjecaoUnidade[];
   avisosGerais: string[];
 }

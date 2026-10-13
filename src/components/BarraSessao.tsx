@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import BotaoTema from "./BotaoTema";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -45,7 +46,7 @@ export default function BarraSessao() {
     <div className="flex items-baseline justify-between gap-3 border-b border-linha py-2 text-xs text-grafite">
       <span className="min-w-0 truncate">
         {dados.nome}
-        <span className="text-grafite/70">
+        <span className="text-muted">
           {" · "}
           {dados.unidades.length === 0
             ? `rede inteira, ${ROTULO_PERFIL[dados.perfil] ?? dados.perfil}`
@@ -55,6 +56,7 @@ export default function BarraSessao() {
         </span>
       </span>
       <span className="flex shrink-0 items-center gap-3">
+        <BotaoTema />
         {dados.abas?.includes("ajustes") && (
           <Link href="/config" className="underline underline-offset-2">
             Ajustes

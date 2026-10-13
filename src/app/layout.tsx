@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#16394A",
+  themeColor: "#f7f6f3",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -35,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-dvh pb-20">
-        <div className="mx-auto w-full max-w-2xl px-4">
+        <div className="mx-auto w-full max-w-painel px-4">
           <Marca />
           <BarraSessao />
           {children}

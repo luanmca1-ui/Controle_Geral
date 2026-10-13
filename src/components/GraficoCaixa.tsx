@@ -70,12 +70,12 @@ export default function GraficoCaixa({
       >
         <defs>
           <pattern id="hachura" width="6" height="6" patternTransform="rotate(-45)" patternUnits="userSpaceOnUse">
-            <rect width="6" height="6" fill="#F6F1E7" />
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#12735C" strokeWidth="3" opacity="0.45" />
+            <rect width="6" height="6" fill="var(--surface)" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--s3-graf)" strokeWidth="3" opacity="0.45" />
           </pattern>
           <pattern id="hachuraRisco" width="6" height="6" patternTransform="rotate(-45)" patternUnits="userSpaceOnUse">
-            <rect width="6" height="6" fill="#F6F1E7" />
-            <line x1="0" y1="0" x2="0" y2="6" stroke="#C62A38" strokeWidth="3" opacity="0.6" />
+            <rect width="6" height="6" fill="var(--surface)" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--crit)" strokeWidth="3" opacity="0.6" />
           </pattern>
         </defs>
 
@@ -86,7 +86,7 @@ export default function GraficoCaixa({
             y={linhaZero}
             width={largura}
             height={alturaSaldo - linhaZero}
-            fill="#C62A38"
+            fill="var(--crit)"
             opacity="0.06"
           />
         )}
@@ -97,15 +97,15 @@ export default function GraficoCaixa({
             x2={largura}
             y1={y(reservaMinima)}
             y2={y(reservaMinima)}
-            stroke="#E08A1E"
+            stroke="var(--warn)"
             strokeWidth="1"
             strokeDasharray="2 4"
           />
         )}
 
-        <line x1="0" x2={largura} y1={linhaZero} y2={linhaZero} stroke="#5C6B72" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1="0" x2={largura} y1={linhaZero} y2={linhaZero} stroke="var(--muted)" strokeWidth="1" strokeDasharray="4 4" />
 
-        <path d={linha} fill="none" stroke="#16394A" strokeWidth="2.5" strokeLinejoin="round" />
+        <path d={linha} fill="none" stroke="var(--s1)" strokeWidth="2.5" strokeLinejoin="round" />
 
         {pontos.map((p) => (
           <circle
@@ -113,8 +113,8 @@ export default function GraficoCaixa({
             cx={p.x}
             cy={p.y}
             r={selecionado === p.dia.data ? 5 : 3}
-            fill={p.dia.saldoFinal < 0 ? "#C62A38" : "#16394A"}
-            stroke="#FFFFFF"
+            fill={p.dia.saldoFinal < 0 ? "var(--crit)" : "var(--s1)"}
+            stroke="var(--surface)"
             strokeWidth="1.5"
           />
         ))}
@@ -129,8 +129,8 @@ export default function GraficoCaixa({
               y={baseEntrada - altura}
               width={passo * 0.64}
               height={Math.max(altura, dia.entrada > 0 ? 2 : 0)}
-              fill={dia.real ? "#12735C" : "url(#hachura)"}
-              stroke={dia.real ? "none" : "#12735C"}
+              fill={dia.real ? "var(--s3-graf)" : "url(#hachura)"}
+              stroke={dia.real ? "none" : "var(--s3-graf)"}
               strokeWidth={dia.real ? 0 : 0.75}
             />
           );
@@ -141,7 +141,7 @@ export default function GraficoCaixa({
           x2={largura}
           y1={baseEntrada}
           y2={baseEntrada}
-          stroke="#DED7C7"
+          stroke="var(--ring)"
           strokeWidth="1"
         />
 
@@ -152,12 +152,12 @@ export default function GraficoCaixa({
               x2={divisoria}
               y1="0"
               y2={baseEntrada}
-              stroke="#16394A"
+              stroke="var(--s1)"
               strokeWidth="1"
               strokeDasharray="3 3"
               opacity="0.6"
             />
-            <text x={divisoria + 4} y="11" fontSize="10" fill="#5C6B72">
+            <text x={divisoria + 4} y="11" fontSize="10" fill="var(--muted)">
               projeção
             </text>
           </>
@@ -188,7 +188,7 @@ export default function GraficoCaixa({
               y={baseEntrada + 16}
               fontSize="10"
               textAnchor="middle"
-              fill="#5C6B72"
+              fill="var(--muted)"
             >
               {ROTULO_DIA_CURTO[dia.diaSemana]} {formatarDataCurta(dia.data).slice(0, 2)}
             </text>

@@ -31,6 +31,8 @@ export const COLUNAS = {
     primeiraLinha: 2, // cabecalho na linha 1
     intervalo: "Faturamento!A2:AE",
     unidadeOriginal: 1, // B
+    clientes: 6, // G
+    atendimentos: 7, // H
     total: 19, // T
     credito: 20, // U
     debito: 21, // V
@@ -195,6 +197,8 @@ export async function lerFaturamento(): Promise<DiaFaturamento[]> {
         data,
         diaSemana: parseDiaSemana(linha[col.diaSemana]) ?? diaSemanaDaData(data),
         total,
+        clientes: Math.round(parseMoeda(linha[col.clientes])),
+        atendimentos: Math.round(parseMoeda(linha[col.atendimentos])),
         credito,
         debito,
         dinheiro,

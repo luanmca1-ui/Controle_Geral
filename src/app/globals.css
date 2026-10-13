@@ -2,54 +2,142 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Tema claro é o padrão. O escuro entra por preferência do sistema ou por
+ * escolha explícita no botão, que grava data-theme no html.
+ * A regra do @media é anulada quando o usuário escolheu claro à mão.
+ */
 :root {
+  --bg: #f7f6f3;
+  --surface: #fcfcfb;
+  --ink: #1a1a19;
+  --ink2: #4a4945;
+  --muted: #6e6d68;
+  --ring: #e6e4df;
+  --chip: #f0efec;
+
+  --s1: #1f5fad;
+  --s2: #c24a19;
+  --s3: #128257;
+  --crit: #c22f2f;
+  --good: #0a7d0a;
+  --warn: #8a6410;
+
+  /* versões vivas, só para preenchimento de gráfico, onde o alvo é 3:1 */
+  --s1-graf: #2a78d6;
+  --s2-graf: #eb6834;
+  --s3-graf: #159568;
+
+  --s1-soft: #e7f0fb;
+  --crit-soft: #fbeaea;
+  --good-soft: #e6f6e6;
+  --warn-soft: #fbf3e0;
+
   color-scheme: light;
 }
 
-body {
-  background-color: theme("colors.papel");
-  color: theme("colors.tinta");
-  -webkit-font-smoothing: antialiased;
-  font-feature-settings: "tnum" 1;
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121211;
+    --surface: #1a1a19;
+    --ink: #f2f1ee;
+    --ink2: #b9b7b1;
+    --muted: #8a8983;
+    --ring: #2e2e2b;
+    --chip: #262623;
+
+    --s1: #5b9ee8;
+    --s2: #f2865a;
+    --s3: #3ecb98;
+    --crit: #e8605f;
+    --good: #35c235;
+    --warn: #e8bb4e;
+
+    --s1-graf: #5b9ee8;
+    --s2-graf: #f2865a;
+    --s3-graf: #3ecb98;
+
+    --s1-soft: #1b2a3b;
+    --crit-soft: #35201f;
+    --good-soft: #16291a;
+    --warn-soft: #322a16;
+
+    color-scheme: dark;
+  }
 }
 
-/* Faixa diagonal usada apenas no dia em que o caixa estoura.
-   Referencia ao poste de barbeiro, e o unico ornamento do painel. */
+[data-theme="dark"] {
+  --bg: #121211;
+  --surface: #1a1a19;
+  --ink: #f2f1ee;
+  --ink2: #b9b7b1;
+  --muted: #8a8983;
+  --ring: #2e2e2b;
+  --chip: #262623;
+
+  --s1: #5b9ee8;
+  --s2: #f2865a;
+  --s3: #3ecb98;
+  --crit: #e8605f;
+  --good: #35c235;
+  --warn: #e8bb4e;
+
+  --s1-graf: #5b9ee8;
+  --s2-graf: #f2865a;
+  --s3-graf: #3ecb98;
+
+  --s1-soft: #1b2a3b;
+  --crit-soft: #35201f;
+  --good-soft: #16291a;
+  --warn-soft: #322a16;
+
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Todo número do painel alinha em coluna */
+.tabular,
+table,
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dia em que o caixa fica negativo, no gráfico de saldo */
 .faixa-risco {
   background-image: repeating-linear-gradient(
     -45deg,
-    #c62a38,
-    #c62a38 4px,
-    #e0555f 4px,
-    #e0555f 8px
+    var(--crit),
+    var(--crit) 4px,
+    var(--crit-soft) 4px,
+    var(--crit-soft) 8px
   );
 }
 
 /* Faixa da marca, com as pontas recortadas como a fita do logo */
 .fita {
-  clip-path: polygon(
-    0 0,
-    100% 0,
-    calc(100% - 10px) 50%,
-    100% 100%,
-    0 100%,
-    10px 50%
-  );
+  clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 50%, 100% 100%, 0 100%, 10px 50%);
 }
 
-/* Lancamento projetado, e nao uma conta que existe na planilha */
+/* Lançamento projetado, e não uma conta lançada na planilha */
 .projetado {
   background-image: repeating-linear-gradient(
     -45deg,
     transparent,
     transparent 5px,
-    rgba(22, 57, 74, 0.06) 5px,
-    rgba(22, 57, 74, 0.06) 10px
+    var(--chip) 5px,
+    var(--chip) 10px
   );
 }
 
 :focus-visible {
-  outline: 2px solid theme("colors.pinho");
+  outline: 2px solid var(--s1);
   outline-offset: 2px;
 }
 

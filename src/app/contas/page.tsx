@@ -203,15 +203,16 @@ export default function PaginaContas() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate">{conta.favorecido}</span>
-                    <span className="block truncate text-grafite">
-                      {conta.unidade} · {conta.categoria}
-                      {!conta.boletoDisponibilizado && (
-                        <span className="text-atencao"> · sem boleto</span>
-                      )}
+                    <span className="block truncate text-xs text-grafite">
+                      {conta.unidade}
+                      {conta.categoria ? `, ${conta.categoria}` : ""}
                     </span>
                     <span className="block truncate text-xs text-grafite">
                       {classificarControle(conta.controle).original ||
                         "sem Controle de Status"}
+                      {!conta.boletoDisponibilizado && (
+                        <span className="text-atencao"> · boleto não disponibilizado</span>
+                      )}
                     </span>
                   </span>
                   <span className="font-mono">{formatarMoeda(conta.valor)}</span>

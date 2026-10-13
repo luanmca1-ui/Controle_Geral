@@ -1,18 +1,33 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export default function PaginaLogin() {
   const router = useRouter();
-  const [codigo, setCodigo] = useState("");
+  const campo = useRef<HTMLInputElement>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
 
+  /**
+   * O código é lido do próprio campo, e não de um estado do React.
+   *
+   * Gerenciador de senha e preenchimento automático escrevem o valor direto no
+   * input sem disparar onChange. Guardando em estado, o texto aparece na tela
+   * mas o envio sai vazio, e o botão nunca destrava.
+   */
   async function entrar() {
-    if (!codigo.trim()) return;
+    const codigo = campo.current?.value.trim() ?? "";
+
+    if (!codigo) {
+      setErro("Digite o código de acesso.");
+      campo.current?.focus();
+      return;
+    }
+
     setEntrando(true);
     setErro(null);
+
     try {
       const resposta = await fetch("/api/login", {
         method: "POST",
@@ -21,6 +36,7 @@ export default function PaginaLogin() {
       });
       const corpo = await resposta.json();
       if (!resposta.ok) throw new Error(corpo?.erro ?? "Não foi possível entrar.");
+
       router.push("/");
       router.refresh();
     } catch (falha) {
@@ -32,40 +48,54 @@ export default function PaginaLogin() {
   return (
     <main className="flex min-h-dvh flex-col justify-center py-10">
       <h1 className="text-2xl font-bold tracking-tight">Entrar no painel</h1>
-      <p className="mt-1 text-sm text-grafite">
+      <p className="mt-1 text-sm leading-relaxed text-grafite">
         Use o código que você recebeu. Ele identifica quem está acessando.
       </p>
 
-      <div className="mt-6 space-y-3">
+      <form
+        className="mt-6 space-y-3"
+        onSubmit={(evento) => {
+          evento.preventDefault();
+          void entrar();
+        }}
+      >
         <label className="block">
           <span className="mb-1 block text-sm text-grafite">Código de acesso</span>
           <input
-            value={codigo}
-            onChange={(evento) => setCodigo(evento.target.value)}
-            onKeyDown={(evento) => {
-              if (evento.key === "Enter") void entrar();
-            }}
+            ref={campo}
+            name="codigo"
+            type="text"
+            inputMode="text"
             autoFocus
             autoCapitalize="characters"
-            autoComplete="one-time-code"
+            autoCorrect="off"
+            autoComplete="username"
             spellCheck={false}
+            enterKeyHint="go"
+            onInput={() => setErro(null)}
             className="w-full border border-linha bg-superficie px-3 py-3 text-center font-mono text-lg tracking-widest"
           />
         </label>
 
         <button
-          type="button"
-          onClick={() => void entrar()}
-          disabled={entrando || !codigo.trim()}
+          type="submit"
+          disabled={entrando}
           className="w-full bg-pinho px-4 py-3 font-medium text-papel disabled:bg-linha disabled:text-grafite"
         >
           {entrando ? "Entrando" : "Entrar"}
         </button>
 
-        {erro && <p className="border-l-2 border-risco px-3 py-2 text-sm text-risco">{erro}</p>}
-      </div>
+        {erro && (
+          <p
+            role="alert"
+            className="border-l-4 border-risco bg-superficie px-3 py-2 text-sm text-risco"
+          >
+            {erro}
+          </p>
+        )}
+      </form>
 
-      <p className="mt-8 text-sm text-grafite">
+      <p className="mt-8 text-sm leading-relaxed text-grafite">
         Perdeu o código ou ele parou de funcionar? Fale com quem administra o painel.
       </p>
     </main>

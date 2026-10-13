@@ -248,7 +248,7 @@ dívidas mesmo.
 
 | Rota | O que faz |
 |---|---|
-| `/hoje` | Painel da gestão: o que pede decisão agora. Só dono e gestora |
+| `/hoje` | Painel executivo: o veredito do período em uma frase, depois os números. Só dono e gestora |
 | `/` | Consolidado da rede, unidades ordenadas por risco |
 | `/unidade/[nome]` | Linha do tempo dia a dia, contas por dia, pendências |
 | `/contas` | Contas a pagar com filtro por unidade e busca |
@@ -287,20 +287,141 @@ o aviso de que a correção é manual, na planilha.
 
 ---
 
-## Painel "O que ver hoje"
+## Painel executivo
 
-Rota `/hoje`, visível só para perfis de edição. Junta num lugar só o que pede
-decisão, ordenado por gravidade:
+Rota `/hoje`, visível só para perfis de edição.
 
-1. Unidades sem caixa para o período, com o dia em que furam
-2. Agendamentos aguardando aprovação, que é o que está parado esperando o dono
-3. Contas sem Controle de Status preenchido
-4. Contas vencidas em aberto
-5. Profissionais sem contrato, com destaque para os que já foram cobrados
-6. Nota fiscal do mês pendente
+Abre com o **veredito em palavras**, em corpo grande, antes de qualquer
+número: "O caixa cobre tudo no período" ou "3 unidades não fecham o período",
+seguido do valor que falta e da data da primeira falha. A decisão vem antes
+da tabela, porque quem abre essa tela tem trinta segundos.
 
-Usa os mesmos períodos do resto do painel: 7 dias, 15 dias, fim do mês e a
-data de partida escolhida.
+Depois, nesta ordem: unidades sem caixa, contas a pagar separadas por status
+de agendamento, vencidas em aberto, faturamento da rede com a variação, três
+números da equipe e a lista completa de unidades com barra de proporção.
+
+---
+
+## Painel executivo: as dez seções
+
+Rota `/hoje`, para dono e gestora. Cada seção responde uma pergunta de
+negócio, e o título é a pergunta.
+
+| # | Pergunta |
+|---|---|
+| 00 | Como leio este painel? |
+| 01 | Como foi o período? |
+| 02 | O que eu faço agora? |
+| 03 | A tendência é de alta ou de queda? |
+| 04 | Que semana foi melhor, de verdade? |
+| 05 | O que vende e o que sobra? |
+| 06 | Quem produz mais, comparado com justiça? |
+| 07 | Onde edito o que está errado? |
+| 08 | Qual unidade está fora da curva? |
+| 09 | Se eu só ler uma coisa, o que é? |
+| 10 | O que significa cada termo? |
+
+Antes de tudo vem o veredito em uma frase: "O caixa cobre tudo no período"
+ou "3 unidades não fecham o período", com o valor que falta e a data da
+primeira falha.
+
+### Honestidade dos números
+
+Quatro regras que valem no painel inteiro:
+
+**Nada vira alerta sem passar no teste.** A comparação entre dois períodos
+roda teste t de Welch nos valores diários, e teste z para proporções. Abaixo
+de p 0,05 o KPI mostra a variação em cinza, escrita "variação normal", e
+nenhum cartão de alerta é gerado. Com 18 unidades comparadas toda semana,
+sem isso alguma sempre varia por acaso e o painel vira alarme falso.
+
+**A janela termina no último dia lançado**, não em hoje. Comparar contra dias
+que a planilha ainda não recebeu faria o período atual parecer sempre pior.
+
+**Semanas e meses comparam média diária**, não total. Semana com 4 dias
+lançados contra uma de 7 teria total menor mesmo rendendo igual. Semana em
+aberto aparece esmaecida e fica fora da média de referência.
+
+**Barbeiro é comparado descontando o mix.** O esperado é quanto a pessoa
+faturaria fazendo os mesmos serviços ao preço médio da rede, e o índice é o
+observado dividido por esse esperado. Quem só faz corte não é punido contra
+quem pega química. Menos de 30 atendimentos no período sai do ranking e
+aparece esmaecido, com o motivo escrito.
+
+### Seção 02, decisões
+
+De 3 a 5 cartões numerados, ordenados pelo tamanho do impacto em reais. Cada
+um tem o tamanho, o alcance, o dono, a confiança e, no rodapé, a prova em 60
+dias: o indicador que precisa se mover se a decisão estiver certa.
+
+As regras que geram decisão: caixa que não fecha, agendamento parado
+esperando aprovação, vencidas em aberto, conta sem Controle de Status,
+documento vencido, comissão acima do configurado, contrato cobrado sem
+retorno e nota fiscal do mês.
+
+### O que ficou de fora, e por quê
+
+Clientes únicos, taxa de retorno, tempo entre visitas, clientes em risco,
+ocupação de agenda, no-show e mapa dia por hora **não existem**. A planilha
+não tem identificador de cliente nem horário de atendimento: a coluna G do
+Faturamento conta pessoas por dia, não identifica quem são, e a aba Comissões
+tem data mas não hora.
+
+Para essas seções existirem, é preciso uma exportação com uma linha por
+atendimento contendo cliente e horário.
+
+---
+
+## Temas e cores
+
+As cores são variáveis CSS em `globals.css`, com tema claro, tema escuro por
+preferência do sistema e um botão que grava a escolha.
+
+A paleta é a do briefing, azul, laranja e verde, mas os tons do tema claro
+foram escurecidos até passarem em 4,5:1 de contraste sobre a superfície.
+O amarelo original ficava em 2,24:1, ilegível como texto. Os tons vivos
+continuam existindo em `--s1-graf`, `--s2-graf` e `--s3-graf`, usados só em
+preenchimento de gráfico, onde o alvo é 3:1.
+
+Contraste medido no tema claro: ink 16,97 · ink2 8,78 · muted 5,05 · s1 6,20
+· s2 4,77 · s3 4,70 · crit 5,47 · good 5,18 · warn 5,23. No escuro, o menor é
+4,97.
+
+## Prévia de design
+
+A rota `/previa` renderiza o painel inteiro nos dois temas com dados
+sintéticos, passando pelo mesmo motor de produção. Serve para trabalhar o
+visual sem depender da planilha. Ela fica fora do login, então **remova a
+rota antes de publicar** se não quiser que fique acessível.
+
+---
+
+## Comparativo e insights
+
+Cada unidade traz a comparação entre os **últimos 28 dias lançados** e os 28
+imediatamente anteriores: faturamento, atendimentos e ticket médio, cada um
+com a variação percentual.
+
+A janela termina no último dia que a planilha recebeu, e não em hoje.
+Comparar contra dias ainda não lançados faria o período atual parecer sempre
+pior do que é.
+
+O ticket médio e o número de atendimentos vêm das colunas **G** (Nº Clientes)
+e **H** (Qtde Atendimentos com pagamento) da aba Faturamento.
+
+A partir dessa comparação o painel escreve observações em linguagem direta,
+cada uma com o que fazer a respeito:
+
+| Observação | Dispara quando |
+|---|---|
+| Faturamento subiu ou caiu | variação de 5% ou mais |
+| Mais atendimentos, menos dinheiro | volume sobe e receita cai, sinal de desconto |
+| Ticket médio subiu ou caiu | variação de 5% ou mais |
+| Fatia alta em dinheiro | espécie passa de 25% do faturamento |
+| Dia fraco da semana | o pior dia rende menos da metade do melhor |
+| Fôlego de caixa | o saldo cobre menos de 15 dias de saída |
+| Concentração de vencimento | mais da metade das contas vence num dia só |
+| Comissão pesada | comissão passa de 15% acima do percentual configurado |
 
 ---
 
@@ -333,7 +454,23 @@ de API refazem a checagem contra a planilha.
 
 ---
 
-### Jurídico (parte de profissionais já funciona)
+### Jurídico
+
+A tela é dividida em três painéis, em vez de uma lista só:
+
+**Contratos** abre com o percentual de assinados entre os ativos e agrupa as
+pessoas por situação, do pior caso para o melhor: cobrados sem retorno, sem
+contrato, assinados sem data, em dia. Os três primeiros grupos abrem
+expandidos; "em dia" fica recolhido, porque não pede ação.
+
+**Notas fiscais** tem o seletor de mês, o percentual de entrega e duas
+listas, pendentes e entregues, com um clique para marcar.
+
+**Documentos** lista alvará, AVCB, licença sanitária e contrato de locação,
+ordenados por urgência, com o custo de renovação do que está vencido ou perto
+de vencer somado no topo.
+
+### Como os dados de profissionais são lidos
 
 Lê a aba **`Profissionais`**. As colunas são localizadas **pelo nome no
 cabeçalho da linha 1**, não por letra fixa, então inserir ou mover coluna não

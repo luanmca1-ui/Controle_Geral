@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { lerComissoes } from "@/lib/sheets";
 import { apurarDesempenho } from "@/lib/comissoes";
+import { ajustarBarbeirosPeloMix, resumirServicos } from "@/lib/agregacoes";
 import { sessaoAtual } from "@/lib/autorizar";
 import { unidadePermitida } from "@/lib/sessao";
 import { diferencaEmDias, hojeEmSaoPaulo, somarDias } from "@/lib/parse";
@@ -39,6 +40,12 @@ export async function GET(requisicao: Request) {
       inicioAnterior,
       fimAnterior,
       atual: apurarDesempenho(lancamentos, inicio, fim),
+      servicos: resumirServicos(
+        lancamentos.filter((i) => i.data >= inicio && i.data <= fim)
+      ),
+      barbeiros: ajustarBarbeirosPeloMix(
+        lancamentos.filter((i) => i.data >= inicio && i.data <= fim)
+      ),
       anterior: apurarDesempenho(lancamentos, inicioAnterior, fimAnterior),
       temDados: todos.length > 0,
     });

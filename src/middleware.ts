@@ -7,7 +7,7 @@ import {
   sessaoConfigurada,
 } from "@/lib/sessao";
 
-const LIVRES = ["/login", "/api/login", "/manifest.json", "/sw.js"];
+const LIVRES = ["/login", "/api/login", "/manifest.json", "/sw.js", "/previa"];
 
 export async function middleware(requisicao: NextRequest) {
   const { pathname } = requisicao.nextUrl;

@@ -1,4 +1,6 @@
 import { diaSemanaDaData, intervaloDeDatas, somarDias, ROTULO_DIA } from "./parse";
+import { calcularComparativo, calcularComparativoRede, gerarInsights } from "./analise";
+import { resumirMeses, resumirSemanas } from "./agregacoes";
 import type {
   AppConfig,
   Conta,
@@ -163,6 +165,8 @@ function semanaBase(
 export interface EntradaProjecao {
   /** comissao ja apurada, por "unidade|data". Substitui o percentual. */
   comissaoReal?: Map<string, number>;
+  /** tamanho da janela do comparativo, em dias */
+  janelaComparativo?: number;
   faturamento: DiaFaturamento[];
   contas: Conta[];
   saldos: SaldoUnidade[];
@@ -179,7 +183,17 @@ function classificar(menorSaldo: number, reservaMinima: number): StatusRisco {
 }
 
 export function projetar(entrada: EntradaProjecao): RespostaProjecao {
-  const { faturamento, contas, saldos, config, inicio, fim, hoje, comissaoReal } = entrada;
+  const {
+    faturamento,
+    contas,
+    saldos,
+    config,
+    inicio,
+    fim,
+    hoje,
+    comissaoReal,
+    janelaComparativo = 28,
+  } = entrada;
 
   const medias = calcularMedias(faturamento, config);
   const real = indexarReal(faturamento);
@@ -390,7 +404,14 @@ export function projetar(entrada: EntradaProjecao): RespostaProjecao {
       avisos.push(`Sem historico de faturamento para: ${[...new Set(diasSemMedia)].join(", ")}.`);
     }
 
-    return {
+    const comparativo = calcularComparativo(
+      faturamento,
+      saldo.unidade,
+      janelaComparativo,
+      config
+    );
+
+    const parcial: ProjecaoUnidade = {
       unidade: saldo.unidade,
       saldoInicial: saldo.saldo,
       atualizadoEm: saldo.atualizadoEm,
@@ -409,9 +430,13 @@ export function projetar(entrada: EntradaProjecao): RespostaProjecao {
       pendencias,
       totalPendencias: pendencias.reduce((total, c) => total + c.valor, 0),
       ultimoRealizado,
+      comparativo,
+      insights: [],
       status: classificar(menorSaldo, config.reservaMinima),
       avisos,
     };
+
+    return { ...parcial, insights: gerarInsights(parcial, comparativo, config) };
   });
 
   const ordemStatus: Record<StatusRisco, number> = { risco: 0, atencao: 1, ok: 2 };
@@ -449,6 +474,9 @@ export function projetar(entrada: EntradaProjecao): RespostaProjecao {
     geradoEm: new Date().toISOString(),
     config,
     resumo,
+    comparativoRede: calcularComparativoRede(faturamento, janelaComparativo, config),
+    evolucaoMensal: resumirMeses(faturamento, 6),
+    semanas: resumirSemanas(faturamento, 8),
     unidades,
     avisosGerais,
   };

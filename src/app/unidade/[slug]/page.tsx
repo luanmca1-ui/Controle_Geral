@@ -5,10 +5,14 @@ import { use, useState } from "react";
 import GraficoCaixa from "@/components/GraficoCaixa";
 import Pendencias from "@/components/Pendencias";
 import Avisos from "@/components/Avisos";
+import ListaInsights from "@/components/ListaInsights";
+import ComparativoFaturamento from "@/components/ComparativoFaturamento";
+import { Pilula, Secao } from "@/components/ui";
 import SeletorPeriodo from "@/components/SeletorPeriodo";
 import { Carregando, Erro, Vazio } from "@/components/Estado";
 import { useProjecao } from "@/components/useProjecao";
 import {
+  formatarDataCompleta,
   formatarDataCurta,
   formatarMoeda,
   hojeEmSaoPaulo,
@@ -37,14 +41,6 @@ export default function PaginaUnidade({
 
       <header className="mb-4 mt-3">
         <h1 className="text-2xl font-bold tracking-tight">{nomeUnidade}</h1>
-        {unidade && (
-          <p className="mt-0.5 text-sm text-grafite">
-            Parte de {formatarMoeda(unidade.saldoInicial)} em conta
-            {unidade.atualizadoEm
-              ? `, informado em ${formatarDataCurta(unidade.atualizadoEm)}`
-              : ", sem data de atualização"}
-          </p>
-        )}
       </header>
 
       <div className="mb-5">
@@ -59,14 +55,44 @@ export default function PaginaUnidade({
 
       {unidade && dados && (
         <>
-          <section className="mb-5 border border-linha bg-superficie p-4">
-            <p className="text-3xl font-bold tracking-tight">
+          <section className="mb-6 border border-linha bg-superficie p-4">
+            <p className="text-sm text-grafite">
+              Saldo previsto em {formatarDataCompleta(dados.fim)}
+            </p>
+            <p
+              className={`text-[30px] font-bold leading-9 tracking-tight ${
+                unidade.saldoFinal < 0 ? "text-risco" : ""
+              }`}
+            >
               {formatarMoeda(unidade.saldoFinal)}
             </p>
-            <p className="mb-4 text-sm text-grafite">
-              {unidade.primeiroDiaNegativo
-                ? `O caixa fura em ${formatarDataCurta(unidade.primeiroDiaNegativo)}. No pior dia faltam ${formatarMoeda(unidade.faltaNoPior)}.`
-                : "O saldo cobre todas as contas do período."}
+            <p className="mb-3 text-sm leading-relaxed text-grafite">
+              {unidade.primeiroDiaNegativo ? (
+                <>
+                  Falta dinheiro a partir de{" "}
+                  <span className="font-medium text-risco">
+                    {formatarDataCompleta(unidade.primeiroDiaNegativo)}
+                  </span>
+                  . No pior dia o buraco chega a {formatarMoeda(unidade.faltaNoPior)}.
+                </>
+              ) : (
+                "O saldo cobre todas as contas do período."
+              )}
+            </p>
+
+            <p className="mb-4 flex flex-wrap items-center gap-2 text-xs text-grafite">
+              <span>
+                Parte de {formatarMoeda(unidade.saldoInicial)} em conta
+                {unidade.atualizadoEm
+                  ? `, informado em ${formatarDataCompleta(unidade.atualizadoEm)}`
+                  : ", sem data de atualização"}
+              </span>
+              {unidade.diasDesatualizado !== null &&
+                unidade.diasDesatualizado > dados.config.diasSaldoDesatualizado && (
+                  <Pilula tom="atencao">
+                    {unidade.diasDesatualizado} dias sem atualizar
+                  </Pilula>
+                )}
             </p>
 
             <GraficoCaixa
@@ -84,10 +110,28 @@ export default function PaginaUnidade({
             )}
           </section>
 
+          {unidade.insights.length > 0 && (
+            <Secao
+              titulo="O que os números dizem"
+              apoio="Leitura automática do que mudou e do que merece atenção."
+            >
+              <ListaInsights itens={unidade.insights} />
+            </Secao>
+          )}
+
+          {unidade.comparativo && unidade.comparativo.atual.diasComDado > 0 && (
+            <Secao
+              titulo="Faturamento"
+              apoio={`Últimos ${unidade.comparativo.dias} dias lançados, contra os ${unidade.comparativo.dias} anteriores. A janela termina no último dia que a planilha recebeu, não em hoje.`}
+            >
+              <ComparativoFaturamento dados={unidade.comparativo} />
+            </Secao>
+          )}
+
           {unidade.avisos.length > 0 && (
-            <section className="mb-5">
+            <Secao titulo="Avisos">
               <Avisos itens={unidade.avisos} />
-            </section>
+            </Secao>
           )}
 
           <section className="mb-6">
@@ -195,7 +239,7 @@ export default function PaginaUnidade({
                                       sai do dinheiro em espécie, não da conta
                                     </span>
                                   </span>
-                                  <span className="font-mono line-through decoration-grafite/50">
+                                  <span className="font-mono line-through decoration-muted">
                                     {formatarMoeda(dia.comissaoAVista)}
                                   </span>
                                 </li>
